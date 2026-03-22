@@ -5,6 +5,8 @@ import { useUiStore } from '@/stores/uiStore'
 import { X, Search } from 'lucide-react'
 import { DEFAULT_RULE_CONFIGS } from '@/utils/constants'
 
+const ALL_VALUE = '__all__'
+
 export function FilterBar() {
   const { detailFilters, setDetailFilter, resetDetailFilters } = useUiStore()
   const hasFilters = Object.values(detailFilters).some(v => v !== null && v !== '')
@@ -83,13 +85,13 @@ function CompactSelect({
   return (
     <Select
       value={value ?? ''}
-      onValueChange={v => onValueChange(v === '__all__' ? null : v)}
+      onValueChange={v => onValueChange(v === ALL_VALUE ? null : v)}
     >
       <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs gap-1 px-2">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="__all__">全部</SelectItem>
+        <SelectItem value={ALL_VALUE}>全部</SelectItem>
         {options.map(opt => (
           <SelectItem key={opt.value} value={opt.value} className="text-xs">
             {opt.label}

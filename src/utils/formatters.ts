@@ -57,3 +57,10 @@ export function severityLabel(severity: RuleSeverity): string {
   }
   return labels[severity]
 }
+
+/** 买卖方向对应的颜色 class */
+export function sideColorClass(side: string): string {
+  return side === '買入'
+    ? 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400'
+    : 'bg-green-50 text-green-600 dark:bg-green-950/30 dark:text-green-400'
+}

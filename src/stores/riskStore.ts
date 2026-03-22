@@ -8,13 +8,9 @@ interface RiskState {
   results: RiskResult[];
   hasResults: boolean;
 
-  /** 运行风险引擎 */
   analyze: (orders: Order[], ruleConfigs: RuleConfig[]) => void;
-  /** 更新单条订单的审阅状态 */
   updateReviewStatus: (orderId: string, status: ReviewStatus) => void;
-  /** 批量更新审阅状态 */
   batchUpdateReviewStatus: (orderIds: string[], status: ReviewStatus) => void;
-  /** 清除结果 */
   clear: () => void;
 }
 
@@ -28,18 +24,23 @@ export const useRiskStore = create<RiskState>((set) => ({
   },
 
   updateReviewStatus: (orderId, status) => {
-    set(state => ({
-      results: state.results.map(r =>
-        r.order.order_id === orderId ? { ...r, review_status: status } : r
-      ),
-    }))
+    set(state => {
+      const idx = state.results.findIndex(r => r.order.order_id === orderId)
+      if (idx === -1 || state.results[idx].review_status === status) return state
+      const results = [...state.results]
+      results[idx] = { ...results[idx], review_status: status }
+      return { results }
+    })
   },
 
   batchUpdateReviewStatus: (orderIds, status) => {
+    if (orderIds.length === 0) return
     const idSet = new Set(orderIds)
     set(state => ({
       results: state.results.map(r =>
-        idSet.has(r.order.order_id) ? { ...r, review_status: status } : r
+        idSet.has(r.order.order_id) && r.review_status !== status
+          ? { ...r, review_status: status }
+          : r
       ),
     }))
   },
