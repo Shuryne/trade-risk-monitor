@@ -1,0 +1,1 @@
+Review all staged changes, then commit them following the git-commit-conventions skill in .claude/skills/. If no changes are staged, stage and commit the latest logical unit of work. Always follow the Conventional Commits format and atomic commit principles defined in the skill.
