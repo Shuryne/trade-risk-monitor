@@ -83,7 +83,7 @@ Use shadcn/ui's `ResizablePanelGroup` (built on `react-resizable-panels`) instea
 
 - `ResizablePanelGroup` with `direction="horizontal"`, `ResizableHandle` between panels
 - Left panel: default 35%, min 25%, max 50% (translates to ~400px default on 1200px screen)
-- Width percentage persisted in `uiStore` (Zustand)
+- Use `react-resizable-panels`'s built-in `autoSaveId="detail-panel"` for persistence (stores to localStorage automatically — no manual `uiStore` field needed)
 - Uses existing `useIsMobile()` hook from `src/hooks/use-mobile.ts` (breakpoint: 768px) to switch to stacked layout on mobile
 
 ---
@@ -114,7 +114,7 @@ Use shadcn/ui's `ResizablePanelGroup` (built on `react-resizable-panels`) instea
 ```
 
 - **Left border**: Color by severity (red/orange/yellow) — retained from current design
-- **Row 1**: Symbol code, side (buy/sell), time — primary identification
+- **Row 1**: Symbol code, side (buy/sell), time — primary identification. `open_close` is deliberately omitted from cards for compactness (visible in detail panel Zone 1).
 - **Row 2**: Account ID + broker ID, amount — context (raw IDs as per data model)
 - **Row 3**: Triggered rule tags + review status dot — decision info
 - **Card height**: ~96px (up from 82px) for better readability
@@ -201,9 +201,8 @@ All filter state stored in `uiStore` (Zustand). Current uiStore already tracks m
 - `reviewStatusFilter: 'ALL' | 'PENDING' | 'REVIEWED' | 'FOLLOW_UP' | 'FALSE_POSITIVE'` (uses existing `ReviewStatus` enum values, plus `'ALL'`)
 - `sortBy: 'amount' | 'time' | 'ruleCount'`
 - `advancedFiltersOpen: boolean`
-- `leftPanelWidth: number` (percentage, persisted)
 
-Note: The existing `detailFilters.severity` field is **removed** since severity is now handled by group collapse/expand state (stored in component state, not Zustand).
+Note: The existing `detailFilters.severity` field is **removed** since severity is now handled by group collapse/expand state (stored in component state, not Zustand — resets to default on page re-entry, which is intentional). Panel width is persisted via `react-resizable-panels`'s `autoSaveId` (not in uiStore).
 
 ---
 
@@ -391,6 +390,7 @@ Located at the top of the Detail page, spanning full width:
 | Pending | Normal text, gray dot `●` on right |
 | Reviewed | Muted text (`text-muted-foreground`), green dot `●`, slight opacity reduction |
 | Follow-up | Normal text, orange dot `●`, orange right-edge accent bar |
+| False Positive | Muted text + strikethrough on rule tags, light gray dot `●` with `×` icon |
 | Active (viewing) | Blue left highlight bar, light blue background (`bg-primary/5`) |
 | Focused (keyboard) | Focus ring (`ring-2 ring-primary`) |
 | Selected (checkbox) | Checkbox filled, subtle background tint (`bg-muted/50`) |
@@ -400,7 +400,9 @@ Located at the top of the Detail page, spanning full width:
 
 ### Group Completion
 
-When all items in a severity group are reviewed (any terminal status: REVIEWED, FOLLOW_UP, or FALSE_POSITIVE):
+When all items in a severity group have a non-PENDING status (i.e., REVIEWED, FOLLOW_UP, or FALSE_POSITIVE — all count as "processed"):
+
+> **Progress counting rule**: Progress numerator = count of items with status in {REVIEWED, FOLLOW_UP, FALSE_POSITIVE}. This applies to both the top progress bar and per-group counters.
 
 ```
 ✓ HIGH 严重 (45/45) — 全部完成
@@ -444,7 +446,7 @@ lastReviewAt: string | null;             // ISO timestamp of the most recent rev
 - `firstReviewAt` / `lastReviewAt` are session-level — used to compute elapsed time in the completion state
 - All review data included in report export (PDF/CSV) as additional columns
 - Persisted across page navigation within the session
-- Saved to IndexedDB when session is saved to history
+- Saved to IndexedDB when session is saved to history — **requires extending `AnalysisSession` type** with `notes`, `reviewTimestamps`, `firstReviewAt`, `lastReviewAt` fields
 
 ---
 
@@ -489,15 +491,18 @@ The resize handle is hidden on mobile (< 768px) where panels stack vertically. T
 
 | Store | Changes |
 |-------|---------|
-| `uiStore` | Add: `reviewStatusFilter`, `sortBy`, `advancedFiltersOpen`, `leftPanelWidth`, `shortcutHintsVisible`. Remove: `detailFilters.severity` (replaced by group collapse). |
+| `uiStore` | Add: `reviewStatusFilter`, `sortBy`, `advancedFiltersOpen`, `shortcutHintsVisible`. Remove: `detailFilters.severity` (replaced by group collapse). |
 | `riskStore` | Add: `notes` map (orderId → string), `reviewTimestamps` map (orderId → ISO timestamp), `firstReviewAt`, `lastReviewAt` |
+| `AnalysisSession` type | Add: `notes`, `reviewTimestamps`, `firstReviewAt`, `lastReviewAt` fields for IndexedDB persistence |
 
 ### New Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| `sonner` | Toast notifications (shadcn/ui ecosystem compatible) |
-| `react-resizable-panels` | Resizable panel layout (used by shadcn/ui's Resizable component) |
+| `sonner` | Toast notifications — install via `npx shadcn@latest add sonner` |
+| `react-resizable-panels` | Resizable panel layout — install via `npx shadcn@latest add resizable` |
+
+Both should be installed via `shadcn add` (not bare `npm install`) to scaffold the wrapper components in `src/components/ui/`.
 
 ---
 
