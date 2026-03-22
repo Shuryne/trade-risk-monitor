@@ -8,7 +8,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
   AlertDialogCancel,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
@@ -72,12 +71,11 @@ const BatchActionDialog = memo(function BatchActionDialog({
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button size="xs" variant="outline">
-          {action.label}
-        </Button>
-      </AlertDialogTrigger>
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        {action.label}
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>确认批量操作</AlertDialogTitle>
@@ -90,7 +88,8 @@ const BatchActionDialog = memo(function BatchActionDialog({
           <AlertDialogAction onClick={handleConfirm}>确定</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
-    </AlertDialog>
+      </AlertDialog>
+    </>
   )
 })
 

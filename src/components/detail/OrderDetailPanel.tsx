@@ -140,7 +140,6 @@ function RuleFlagRow({
 export const OrderDetailPanel = memo(function OrderDetailPanel({
   result,
   allOrders,
-  riskResults,
   note,
   onStatusChange,
   onNoteChange,
