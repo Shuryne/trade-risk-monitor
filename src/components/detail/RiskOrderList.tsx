@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { formatDateTime, formatAmount, sideColorClass } from '@/utils/formatters'
 import { cn } from '@/lib/utils'
 import { SEVERITY_CONFIG } from '@/utils/severity'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 interface RiskOrderListProps {
   results: RiskResult[];
@@ -32,11 +33,7 @@ export const RiskOrderList = memo(function RiskOrderList({
   })
 
   if (results.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center p-6">
-        <p className="text-sm text-muted-foreground">没有匹配的风险订单</p>
-      </div>
-    )
+    return <EmptyState message="没有匹配的风险订单" />
   }
 
   return (

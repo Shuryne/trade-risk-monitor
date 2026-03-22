@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianG
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { storageService } from '@/services/storageService'
 import type { AnalysisSession } from '@/types/risk'
+import { EmptyTableRow } from '@/components/shared/EmptyState'
 
 export default function TrendPage() {
   const [sessions, setSessions] = useState<AnalysisSession[]>([])
@@ -139,13 +140,7 @@ export default function TrendPage() {
                     <TableCell className="text-right tabular-nums">{count}</TableCell>
                   </TableRow>
                 ))}
-                {topAccounts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
-                      无数据
-                    </TableCell>
-                  </TableRow>
-                )}
+                {topAccounts.length === 0 && <EmptyTableRow colSpan={3} message="无数据" />}
               </TableBody>
             </Table>
           </CardContent>

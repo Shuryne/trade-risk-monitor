@@ -4,6 +4,7 @@ import { RiskBadge } from '@/components/shared/RiskBadge'
 import type { RiskResult } from '@/types/risk'
 import type { RuleSeverity } from '@/types/rule'
 import { severityWeight } from '@/utils/severity'
+import { EmptyTableRow } from '@/components/shared/EmptyState'
 
 interface TopAccountsTableProps {
   results: RiskResult[];
@@ -49,13 +50,7 @@ export function TopAccountsTable({ results }: TopAccountsTableProps) {
                 <TableCell><RiskBadge severity={highestSeverity} /></TableCell>
               </TableRow>
             ))}
-            {top10.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                  无风险账户
-                </TableCell>
-              </TableRow>
-            )}
+            {top10.length === 0 && <EmptyTableRow colSpan={4} message="无风险账户" />}
           </TableBody>
         </Table>
       </CardContent>

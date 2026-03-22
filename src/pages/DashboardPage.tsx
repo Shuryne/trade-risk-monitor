@@ -8,14 +8,14 @@ import { MarketCompareChart } from '@/components/dashboard/MarketCompareChart'
 import { useOrderStore } from '@/stores/orderStore'
 import { useRiskStore } from '@/stores/riskStore'
 import { formatNumber, formatPercent } from '@/utils/formatters'
+import { countBySeverity } from '@/utils/riskAggregation'
 import { FileBarChart, AlertTriangle, ShieldAlert, Users, Globe } from 'lucide-react'
 
 export default function DashboardPage() {
   const { orders, summary } = useOrderStore()
   const { results } = useRiskStore()
 
-  const riskCount = results.length
-  const highCount = results.filter(r => r.highest_severity === 'HIGH').length
+  const counts = countBySeverity(results)
   const riskAccountIds = new Set(results.map(r => r.order.account_id))
 
   const hkOrders = orders.filter(o => o.market === 'HK').length
@@ -35,14 +35,14 @@ export default function DashboardPage() {
           />
           <StatCard
             label="风险订单"
-            value={formatNumber(riskCount)}
-            subValue={summary.totalRows > 0 ? `占比 ${formatPercent(riskCount / summary.totalRows)}` : undefined}
+            value={formatNumber(counts.total)}
+            subValue={summary.totalRows > 0 ? `占比 ${formatPercent(counts.total / summary.totalRows)}` : undefined}
             icon={AlertTriangle}
             iconColor="text-orange-500"
           />
           <StatCard
             label="高风险订单"
-            value={formatNumber(highCount)}
+            value={formatNumber(counts.high)}
             icon={ShieldAlert}
             iconColor="text-red-500"
           />

@@ -11,6 +11,7 @@ import { ValidationReport } from '@/components/upload/ValidationReport'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, RotateCcw } from 'lucide-react'
 import type { AnalysisSession } from '@/types/risk'
+import { countBySeverity } from '@/utils/riskAggregation'
 
 export default function UploadPage() {
   const navigate = useNavigate()
@@ -38,15 +39,16 @@ export default function UploadPage() {
 
     // 自动持久化到 IndexedDB
     const results = useRiskStore.getState().results
+    const counts = countBySeverity(results)
     const session: AnalysisSession = {
       id: crypto.randomUUID(),
       date: summary.timeRange?.start?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       created_at: new Date().toISOString(),
       total_orders: orders.length,
-      risk_orders: results.length,
-      high_risk_count: results.filter(r => r.highest_severity === 'HIGH').length,
-      medium_risk_count: results.filter(r => r.highest_severity === 'MEDIUM').length,
-      low_risk_count: results.filter(r => r.highest_severity === 'LOW').length,
+      risk_orders: counts.total,
+      high_risk_count: counts.high,
+      medium_risk_count: counts.medium,
+      low_risk_count: counts.low,
       market_breakdown: {
         HK: {
           total: orders.filter(o => o.market === 'HK').length,

@@ -9,15 +9,15 @@ import { useRiskStore } from '@/stores/riskStore'
 import { useRuleConfigStore } from '@/stores/ruleConfigStore'
 import { generatePdfReport, exportRiskCsv } from '@/services/reportGenerator'
 import { formatDateTime, formatAmount, formatNumber, formatPercent } from '@/utils/formatters'
+import { countBySeverity } from '@/utils/riskAggregation'
+import { EmptyTableRow } from '@/components/shared/EmptyState'
 
 export default function ReportPage() {
   const { orders, summary } = useOrderStore()
   const { results } = useRiskStore()
   const { configs } = useRuleConfigStore()
 
-  const highCount = results.filter(r => r.highest_severity === 'HIGH').length
-  const medCount = results.filter(r => r.highest_severity === 'MEDIUM').length
-  const lowCount = results.filter(r => r.highest_severity === 'LOW').length
+  const counts = countBySeverity(results)
 
   const handleExportPdf = useCallback(() => {
     generatePdfReport({ orders, results, ruleConfigs: configs, summary })
@@ -72,9 +72,9 @@ export default function ReportPage() {
             <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
               <div><span className="text-muted-foreground">风险订单总数:</span> {formatNumber(results.length)}</div>
               <div><span className="text-muted-foreground">风险占比:</span> {summary.totalRows > 0 ? formatPercent(results.length / summary.totalRows) : '0%'}</div>
-              <div className="text-red-600">高风险: {highCount}</div>
-              <div className="text-orange-600">中风险: {medCount}</div>
-              <div className="text-yellow-600">低风险: {lowCount}</div>
+              <div className="text-red-600">高风险: {counts.high}</div>
+              <div className="text-orange-600">中风险: {counts.medium}</div>
+              <div className="text-yellow-600">低风险: {counts.low}</div>
             </div>
           </CardContent>
         </Card>
@@ -110,13 +110,7 @@ export default function ReportPage() {
                       <TableCell className="text-xs">{r.flags.map(f => f.rule_name).join(', ')}</TableCell>
                     </TableRow>
                   ))}
-                  {results.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
-                        暂无风险订单
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  {results.length === 0 && <EmptyTableRow colSpan={8} message="暂无风险订单" />}
                 </TableBody>
               </Table>
             </div>

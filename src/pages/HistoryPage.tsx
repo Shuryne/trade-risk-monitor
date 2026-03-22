@@ -10,6 +10,7 @@ import { useRiskStore } from '@/stores/riskStore'
 import type { AnalysisSession } from '@/types/risk'
 import { formatNumber } from '@/utils/formatters'
 import { Eye, Trash2 } from 'lucide-react'
+import { EmptyTableRow } from '@/components/shared/EmptyState'
 
 export default function HistoryPage() {
   const [sessions, setSessions] = useState<AnalysisSession[]>([])
@@ -88,11 +89,7 @@ export default function HistoryPage() {
             </TableHeader>
             <TableBody>
               {sessions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    暂无历史记录
-                  </TableCell>
-                </TableRow>
+                <EmptyTableRow colSpan={8} message="暂无历史记录" />
               ) : (
                 sessions.map(session => (
                   <TableRow key={session.id}>
