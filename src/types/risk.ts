@@ -1,4 +1,4 @@
-import type { Order } from './order'
+import type { Order, Market } from './order'
 import type { RuleConfig, RuleSeverity } from './rule'
 
 /** 单条风险标记 */
@@ -37,9 +37,4 @@ export interface AnalysisSession {
   orders: Order[];
   risk_results: RiskResult[];
   rule_config: RuleConfig[];
-  // Review tracking (added for detail page redesign)
-  notes: Record<string, string>;            // orderId → note text
-  reviewTimestamps: Record<string, string>;  // orderId → ISO 8601 timestamp
-  firstReviewAt: string | null;
-  lastReviewAt: string | null;
 }

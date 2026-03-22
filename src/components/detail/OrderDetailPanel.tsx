@@ -1,331 +1,196 @@
-import { memo, useMemo, useState } from 'react'
-import type { RiskResult, RiskFlag, ReviewStatus } from '@/types/risk'
+import { memo, useMemo } from 'react'
+import type { RiskResult, ReviewStatus } from '@/types/risk'
 import type { Order } from '@/types/order'
 import { RiskBadge } from '@/components/shared/RiskBadge'
-import { ReviewActions } from '@/components/detail/ReviewActions'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatDateTime, formatAmount, formatNumber, formatTime, sideColorClass } from '@/utils/formatters'
-import { AlertTriangle, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
+import { formatDateTime, formatAmount, formatNumber, sideColorClass } from '@/utils/formatters'
+import { useOrderStore } from '@/stores/orderStore'
+import { useRiskStore } from '@/stores/riskStore'
+import { CheckCircle, Flag, XCircle, Clock, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+const statusConfig: Record<ReviewStatus, { label: string; icon: typeof CheckCircle; className: string }> = {
+  PENDING: { label: '待审阅', icon: Clock, className: 'text-muted-foreground' },
+  REVIEWED: { label: '已审阅', icon: CheckCircle, className: 'text-green-600' },
+  FOLLOW_UP: { label: '需跟进', icon: Flag, className: 'text-orange-600' },
+  FALSE_POSITIVE: { label: '误报', icon: XCircle, className: 'text-muted-foreground' },
+}
+
 interface OrderDetailPanelProps {
-  result: RiskResult | null;
-  allOrders: Order[];
-  note: string;
-  onStatusChange: (orderId: string, status: ReviewStatus) => void;
-  onNoteChange: (orderId: string, note: string) => void;
-  onSelectOrder: (orderId: string) => void;
-  summaryStats?: { total: number; high: number; medium: number; low: number };
+  result: RiskResult;
 }
 
-// --- Zone 3 helpers ---
+export const OrderDetailPanel = memo(function OrderDetailPanel({ result }: OrderDetailPanelProps) {
+  const allOrders = useOrderStore(s => s.orders)
+  const updateReviewStatus = useRiskStore(s => s.updateReviewStatus)
 
-const RELATED_INITIAL_LIMIT = 10
-
-function RelatedOrdersTable({
-  orders,
-  highlightId,
-  onSelectOrder,
-}: {
-  orders: Order[]
-  highlightId: string
-  onSelectOrder: (orderId: string) => void
-}) {
-  const [showAll, setShowAll] = useState(false)
-  const displayed = showAll ? orders : orders.slice(0, RELATED_INITIAL_LIMIT)
-  const hasMore = orders.length > RELATED_INITIAL_LIMIT
-
-  if (orders.length === 0) {
-    return <p className="text-xs text-muted-foreground py-3 text-center">无关联交易</p>
-  }
-
-  return (
-    <div className="space-y-1">
-      <div className="rounded-md border max-h-80 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs h-8">时间</TableHead>
-              <TableHead className="text-xs h-8">方向</TableHead>
-              <TableHead className="text-xs h-8">标的</TableHead>
-              <TableHead className="text-xs h-8 text-right">数量</TableHead>
-              <TableHead className="text-xs h-8 text-right">金额</TableHead>
-              <TableHead className="text-xs h-8">状态</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayed.map(o => (
-              <TableRow
-                key={o.order_id}
-                className={cn(
-                  'text-xs cursor-pointer hover:bg-muted/50',
-                  o.order_id === highlightId && 'bg-primary/5 font-medium',
-                )}
-                onClick={() => onSelectOrder(o.order_id)}
-              >
-                <TableCell className="py-2 text-xs">{formatDateTime(o.order_time)}</TableCell>
-                <TableCell className={cn('py-2 text-xs', o.side === '買入' ? 'text-red-600' : 'text-green-600')}>
-                  {o.side}
-                </TableCell>
-                <TableCell className="py-2 text-xs font-medium">{o.symbol}</TableCell>
-                <TableCell className="py-2 text-xs text-right tabular-nums">{formatNumber(o.order_quantity)}</TableCell>
-                <TableCell className="py-2 text-xs text-right tabular-nums">{formatAmount(o.order_amount, o.currency)}</TableCell>
-                <TableCell className="py-2 text-xs">{o.order_status}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {hasMore && (
-        <button
-          type="button"
-          className="text-xs text-primary hover:underline px-1"
-          onClick={() => setShowAll(prev => !prev)}
-        >
-          {showAll ? '收起' : `显示全部 ${orders.length} 条`}
-        </button>
-      )}
-    </div>
-  )
-}
-
-// --- Severity icon color ---
-
-const severityIconColor: Record<string, string> = {
-  HIGH: 'text-red-600',
-  MEDIUM: 'text-orange-500',
-  LOW: 'text-yellow-600',
-}
-
-// --- Zone 2: Single Rule Row ---
-
-function RuleFlagRow({
-  flag,
-  onSelectOrder,
-}: {
-  flag: RiskFlag
-  onSelectOrder: (orderId: string) => void
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-md border px-3 py-2">
-      <AlertTriangle className={cn('h-4 w-4 shrink-0 mt-0.5', severityIconColor[flag.severity] ?? 'text-muted-foreground')} />
-      <div className="min-w-0 space-y-0.5">
-        <p className="text-xs font-semibold">{flag.rule_id} {flag.rule_name}</p>
-        <p className="text-xs text-muted-foreground break-words">{flag.description}</p>
-        {flag.related_orders && flag.related_orders.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {flag.related_orders.map(relId => (
-              <button
-                key={relId}
-                type="button"
-                className="text-xs text-primary hover:underline"
-                onClick={() => onSelectOrder(relId)}
-              >
-                关联订单: {relId.slice(-10)}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// --- Main Component ---
-
-export const OrderDetailPanel = memo(function OrderDetailPanel({
-  result,
-  allOrders,
-  note,
-  onStatusChange,
-  onNoteChange,
-  onSelectOrder,
-  summaryStats,
-}: OrderDetailPanelProps) {
-
-  // --- Empty State ---
-  if (!result) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-3">
-        <ClipboardList className="h-12 w-12 opacity-30" />
-        <p className="text-sm">选择左侧订单开始审查</p>
-        {summaryStats && (
-          <p className="text-xs">
-            共 {summaryStats.total} 条风险订单 · {summaryStats.high} 高 · {summaryStats.medium} 中 · {summaryStats.low} 低
-          </p>
-        )}
-        <p className="text-xs opacity-60">提示: 使用 ↑↓ 键导航, Enter 标记已审</p>
-      </div>
-    )
-  }
-
-  const o = result.order
-
-  // --- Zone 2: collapsible rules ---
-  const [rulesExpanded, setRulesExpanded] = useState(false)
-  const RULES_COLLAPSE_THRESHOLD = 3
-  const visibleFlags = rulesExpanded ? result.flags : result.flags.slice(0, RULES_COLLAPSE_THRESHOLD)
-  const hasHiddenRules = result.flags.length > RULES_COLLAPSE_THRESHOLD
-
-  // --- Zone 3: related orders ---
   const { sameAccountOrders, sameSymbolOrders } = useMemo(() => {
     const acct: Order[] = []
     const sym: Order[] = []
-    for (const ord of allOrders) {
-      if (ord.order_id === o.order_id) continue
-      if (ord.account_id === o.account_id) acct.push(ord)
-      if (ord.symbol === o.symbol) sym.push(ord)
+    for (const o of allOrders) {
+      if (o.account_id === result.order.account_id) acct.push(o)
+      if (o.symbol === result.order.symbol) sym.push(o)
     }
-    // Sort by time descending
-    const timeDesc = (a: Order, b: Order) => b.order_time.localeCompare(a.order_time)
-    acct.sort(timeDesc)
-    sym.sort(timeDesc)
     return { sameAccountOrders: acct, sameSymbolOrders: sym }
-  }, [allOrders, o.order_id, o.account_id, o.symbol])
+  }, [allOrders, result.order.account_id, result.order.symbol])
 
-  // Format the amount for display (compact)
-  const displayAmount = (() => {
-    const amt = o.order_amount
-    if (amt >= 1_000_000) {
-      return `${o.currency} ${(amt / 1_000_000).toFixed(2)}M`
-    }
-    if (amt >= 1_000) {
-      return `${o.currency} ${(amt / 1_000).toFixed(1)}K`
-    }
-    return formatAmount(amt, o.currency)
-  })()
+  const o = result.order
+  const currentStatus = statusConfig[result.review_status]
+  const CurrentStatusIcon = currentStatus.icon
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4 pb-20">
-        {/* Zone 1: Order Summary */}
-        <Card size="sm">
-          <CardHeader className="pb-0">
-            <div className="flex items-center justify-between">
+      <div className="p-5 space-y-6">
+        {/* Header */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">{o.symbol}</h2>
               <RiskBadge severity={result.highest_severity} />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              <span className={cn('font-medium', sideColorClass(o.side), 'px-1 py-0.5 rounded')}>
-                {o.side}
+              <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', sideColorClass(o.side))}>
+                {o.side} · {o.open_close}
               </span>
-              {' · '}{o.open_close}{' · '}{o.market === 'HK' ? '港股' : '美股'}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Primary metrics */}
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground">金额</p>
-                <p className="text-sm font-mono tabular-nums font-bold mt-0.5">{displayAmount}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">数量</p>
-                <p className="text-sm font-mono tabular-nums mt-0.5">{formatNumber(o.order_quantity)}股</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">价格</p>
-                <p className="text-sm font-mono tabular-nums mt-0.5">{o.order_price.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">时间</p>
-                <p className="text-sm font-mono tabular-nums mt-0.5">{formatTime(o.order_time)}</p>
-              </div>
             </div>
 
-            {/* Secondary info */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>账户 <span className="font-mono text-foreground">{o.account_id}</span></span>
-              <span>经纪人 <span className="font-mono text-foreground">{o.broker_id}</span></span>
-              <span>订单号 <span className="font-mono text-foreground">{o.order_id.slice(-10)}</span></span>
+            <div className="flex items-center gap-1">
+              <span className={cn('flex items-center gap-1 text-xs mr-2', currentStatus.className)}>
+                <CurrentStatusIcon className="h-3.5 w-3.5" />
+                {currentStatus.label}
+              </span>
+              {result.review_status !== 'REVIEWED' && (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateReviewStatus(o.order_id, 'REVIEWED')}>
+                  已审阅
+                </Button>
+              )}
+              {result.review_status !== 'FOLLOW_UP' && (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateReviewStatus(o.order_id, 'FOLLOW_UP')}>
+                  需跟进
+                </Button>
+              )}
+              {result.review_status !== 'FALSE_POSITIVE' && (
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => updateReviewStatus(o.order_id, 'FALSE_POSITIVE')}>
+                  误报
+                </Button>
+              )}
             </div>
+          </div>
 
-            {/* Message if present */}
-            {o.message && (
-              <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                <p className="text-xs">{o.message}</p>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
+            <Field label="订单编号" value={o.order_id.slice(-10)} mono />
+            <Field label="下单时间" value={formatDateTime(o.order_time)} />
+            <Field label="账户" value={o.account_id} mono />
+            <Field label="经纪人号" value={o.broker_id} mono />
+            <Field label="委托价格" value={o.order_price.toFixed(4)} />
+            <Field label="委托数量" value={formatNumber(o.order_quantity)} />
+            <Field label="委托金额" value={formatAmount(o.order_amount, o.currency)} bold />
+            <Field label="市场" value={`${o.market} · ${o.order_type}`} />
+            <Field label="订单状态" value={o.order_status} />
+            <Field label="已成交数量" value={formatNumber(o.filled_quantity)} />
+            <Field label="已成交金额" value={formatAmount(o.filled_amount, o.currency)} />
+            <Field label="成交均价" value={o.filled_avg_price > 0 ? o.filled_avg_price.toFixed(4) : '-'} />
+          </div>
+
+          {o.message && (
+            <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-xs">{o.message}</p>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            触发规则 ({result.flags.length})
+          </h3>
+          <div className="space-y-1.5">
+            {result.flags.map((flag, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-md border px-3 py-2 hover:border-primary/20 transition-colors">
+                <div className="shrink-0 pt-0.5">
+                  <RiskBadge severity={flag.severity} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">{flag.rule_id} {flag.rule_name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 break-words">{flag.description}</p>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Zone 2: Triggered Rules */}
-        <Card size="sm">
-          <CardHeader className="pb-0">
-            <CardTitle className="text-sm">触发规则 ({result.flags.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {visibleFlags.map((flag, i) => (
-              <RuleFlagRow key={i} flag={flag} onSelectOrder={onSelectOrder} />
             ))}
-            {hasHiddenRules && (
-              <button
-                type="button"
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-                onClick={() => setRulesExpanded(prev => !prev)}
-              >
-                {rulesExpanded ? (
-                  <>
-                    <ChevronUp className="h-3 w-3" />
-                    收起
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-3 w-3" />
-                    显示更多 {result.flags.length - RULES_COLLAPSE_THRESHOLD} 条
-                  </>
-                )}
-              </button>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Zone 3: Related Trades */}
-        <Card size="sm">
-          <CardContent className="pt-1">
-            <Tabs defaultValue="account">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium">关联交易</h3>
-                <TabsList className="h-7">
-                  <TabsTrigger value="account" className="text-xs px-2.5 h-6">
-                    同账户 ({sameAccountOrders.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="symbol" className="text-xs px-2.5 h-6">
-                    同标的 ({sameSymbolOrders.length})
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+        <Separator />
 
-              <TabsContent value="account" className="mt-0">
-                <RelatedOrdersTable
-                  orders={sameAccountOrders}
-                  highlightId={o.order_id}
-                  onSelectOrder={onSelectOrder}
-                />
-              </TabsContent>
-              <TabsContent value="symbol" className="mt-0">
-                <RelatedOrdersTable
-                  orders={sameSymbolOrders}
-                  highlightId={o.order_id}
-                  onSelectOrder={onSelectOrder}
-                />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="account" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">关联交易</h3>
+            <TabsList className="h-7">
+              <TabsTrigger value="account" className="text-xs px-2.5 h-6">
+                同账户 ({sameAccountOrders.length})
+              </TabsTrigger>
+              <TabsTrigger value="symbol" className="text-xs px-2.5 h-6">
+                同标的 ({sameSymbolOrders.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="account" className="mt-0">
+            <RelatedOrdersTable orders={sameAccountOrders} highlightId={o.order_id} />
+          </TabsContent>
+          <TabsContent value="symbol" className="mt-0">
+            <RelatedOrdersTable orders={sameSymbolOrders} highlightId={o.order_id} />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Zone 4: Review Actions - sticky at bottom */}
-      <ReviewActions
-        result={result}
-        note={note}
-        onStatusChange={onStatusChange}
-        onNoteChange={onNoteChange}
-      />
     </ScrollArea>
+  )
+})
+
+const Field = memo(function Field({ label, value, mono, bold }: { label: string; value: string; mono?: boolean; bold?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className={cn('text-sm mt-0.5', mono && 'font-mono', bold && 'font-semibold')}>{value}</p>
+    </div>
+  )
+})
+
+const RelatedOrdersTable = memo(function RelatedOrdersTable({ orders, highlightId }: { orders: Order[]; highlightId: string }) {
+  return (
+    <div className="rounded-md border max-h-80 overflow-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs h-8">时间</TableHead>
+            <TableHead className="text-xs h-8">方向</TableHead>
+            <TableHead className="text-xs h-8">标的</TableHead>
+            <TableHead className="text-xs h-8 text-right">数量</TableHead>
+            <TableHead className="text-xs h-8 text-right">金额</TableHead>
+            <TableHead className="text-xs h-8">状态</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map(o => (
+            <TableRow
+              key={o.order_id}
+              className={cn('text-xs', o.order_id === highlightId && 'bg-primary/5 font-medium')}
+            >
+              <TableCell className="py-2 text-xs">{formatDateTime(o.order_time)}</TableCell>
+              <TableCell className={cn('py-2 text-xs', o.side === '買入' ? 'text-red-600' : 'text-green-600')}>
+                {o.side}
+              </TableCell>
+              <TableCell className="py-2 text-xs font-medium">{o.symbol}</TableCell>
+              <TableCell className="py-2 text-xs text-right tabular-nums">{formatNumber(o.order_quantity)}</TableCell>
+              <TableCell className="py-2 text-xs text-right tabular-nums">{formatAmount(o.order_amount, o.currency)}</TableCell>
+              <TableCell className="py-2 text-xs">{o.order_status}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
 })
