@@ -1,6 +1,17 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useOrderStore } from '@/stores/orderStore'
 import { useRiskStore } from '@/stores/riskStore'
+import {
+  Sidebar as SidebarPrimitive,
+  SidebarContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarRail,
+} from '@/components/ui/sidebar'
 import {
   Upload,
   LayoutDashboard,
@@ -27,46 +38,59 @@ export function Sidebar() {
   const hasData = useOrderStore(s => s.hasData)
   const hasResults = useRiskStore(s => s.hasResults)
   const dataReady = hasData && hasResults
+  const location = useLocation()
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r bg-sidebar">
-      {/* Logo */}
-      <div className="flex items-center gap-2 border-b px-4 py-4">
-        <ShieldAlert className="h-6 w-6 text-primary" />
-        <span className="text-sm font-semibold">交易风险监控</span>
-      </div>
+    <SidebarPrimitive collapsible="icon">
+      <SidebarHeader className="border-b px-3 py-3">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-primary shrink-0" />
+          <span className="text-sm font-semibold truncate group-data-[collapsible=icon]:hidden">
+            交易风险监控
+          </span>
+        </div>
+      </SidebarHeader>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-2 py-3">
-        {navItems.map(item => {
-          const disabled = item.requiresData && !dataReady
-          const Icon = item.icon
-          return (
-            <NavLink
-              key={item.to}
-              to={disabled ? '#' : item.to}
-              onClick={e => disabled && e.preventDefault()}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                  isActive && !disabled
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                  disabled && 'pointer-events-none opacity-40'
-                )
-              }
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </NavLink>
-          )
-        })}
-      </nav>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            {navItems.map(item => {
+              const disabled = item.requiresData && !dataReady
+              const Icon = item.icon
+              const isActive = item.to === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(item.to)
 
-      {/* Footer */}
-      <div className="border-t px-4 py-3">
-        <p className="text-xs text-muted-foreground">数据仅在本地处理</p>
-      </div>
-    </aside>
+              return (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton
+                    tooltip={item.label}
+                    isActive={isActive && !disabled}
+                    className={cn(disabled && 'pointer-events-none opacity-40')}
+                    render={
+                      <NavLink
+                        to={disabled ? '#' : item.to}
+                        onClick={e => disabled && e.preventDefault()}
+                      />
+                    }
+                  >
+                    <Icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t">
+        <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+          数据仅在本地处理
+        </p>
+      </SidebarFooter>
+
+      <SidebarRail />
+    </SidebarPrimitive>
   )
 }
