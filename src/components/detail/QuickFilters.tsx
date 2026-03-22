@@ -8,7 +8,7 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 const ALL_VALUE = '__all__'
 
 interface QuickFiltersProps {
-  searchRef?: React.RefObject<HTMLInputElement>;
+  searchRef?: React.RefObject<HTMLInputElement | null>;
   onToggleAdvanced: () => void;
   advancedOpen: boolean;
   activeAdvancedCount: number;

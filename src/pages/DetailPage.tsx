@@ -1,112 +1,348 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { useRiskStore } from '@/stores/riskStore'
 import { useUiStore } from '@/stores/uiStore'
-import { FilterBar } from '@/components/detail/FilterBar'
+import { useOrderStore } from '@/stores/orderStore'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation'
+import { ReviewProgressBar } from '@/components/detail/ReviewProgressBar'
+import { QuickFilters } from '@/components/detail/QuickFilters'
+import { AdvancedFilters } from '@/components/detail/AdvancedFilters'
+import { ActiveFilterTags } from '@/components/detail/ActiveFilterTags'
 import { RiskOrderList } from '@/components/detail/RiskOrderList'
 import { OrderDetailPanel } from '@/components/detail/OrderDetailPanel'
+import { BatchActionBar } from '@/components/detail/BatchActionBar'
+import { ShortcutHintBar } from '@/components/detail/ShortcutHintBar'
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable'
 import type { ReviewStatus } from '@/types/risk'
-import { Button } from '@/components/ui/button'
-import { CheckCircle, Flag, XCircle } from 'lucide-react'
 
 export default function DetailPage() {
-  const results = useRiskStore(s => s.results)
-  const batchUpdateReviewStatus = useRiskStore(s => s.batchUpdateReviewStatus)
-  const detailFilters = useUiStore(s => s.detailFilters)
+  // ---------------------------------------------------------------------------
+  // Store selectors
+  // ---------------------------------------------------------------------------
+  const riskResults = useRiskStore((s) => s.results)
+  const notes = useRiskStore((s) => s.notes)
+  const firstReviewAt = useRiskStore((s) => s.firstReviewAt)
+  const lastReviewAt = useRiskStore((s) => s.lastReviewAt)
+  const updateReviewStatus = useRiskStore((s) => s.updateReviewStatus)
+  const batchUpdateReviewStatus = useRiskStore((s) => s.batchUpdateReviewStatus)
+  const setNote = useRiskStore((s) => s.setNote)
+
+  const detailFilters = useUiStore((s) => s.detailFilters)
+  const reviewStatusFilter = useUiStore((s) => s.reviewStatusFilter)
+  const advancedFiltersOpen = useUiStore((s) => s.advancedFiltersOpen)
+  const setAdvancedFiltersOpen = useUiStore((s) => s.setAdvancedFiltersOpen)
+
+  const allOrders = useOrderStore((s) => s.orders)
+
+  const isMobile = useIsMobile()
+
+  // ---------------------------------------------------------------------------
+  // Refs
+  // ---------------------------------------------------------------------------
+  const searchRef = useRef<HTMLInputElement>(null)
+  const listContainerRef = useRef<HTMLDivElement>(null)
+
+  // ---------------------------------------------------------------------------
+  // Selection state
+  // ---------------------------------------------------------------------------
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+  const [lastCheckedId, setLastCheckedId] = useState<string | null>(null)
 
+  // ---------------------------------------------------------------------------
+  // Filtering
+  // ---------------------------------------------------------------------------
   const filteredResults = useMemo(() => {
-    let filtered = results
-    if (detailFilters.ruleId) filtered = filtered.filter(r => r.flags.some(f => f.rule_id === detailFilters.ruleId))
-    if (detailFilters.market) filtered = filtered.filter(r => r.order.market === detailFilters.market)
-    if (detailFilters.side) filtered = filtered.filter(r => r.order.side === detailFilters.side)
-    if (detailFilters.account) filtered = filtered.filter(r => r.order.account_id === detailFilters.account)
-    if (detailFilters.symbol) filtered = filtered.filter(r => r.order.symbol === detailFilters.symbol)
-    if (detailFilters.status) filtered = filtered.filter(r => r.order.order_status === detailFilters.status)
-    if (detailFilters.search) {
-      const q = detailFilters.search.toLowerCase()
-      filtered = filtered.filter(r =>
-        r.order.order_id.toLowerCase().includes(q) ||
-        r.order.account_id.toLowerCase().includes(q) ||
-        r.order.symbol.toLowerCase().includes(q) ||
-        r.order.broker_id.toLowerCase().includes(q)
+    let filtered = riskResults
+    const { search, market, side, ruleId, account, broker, status } = detailFilters
+
+    if (search) {
+      const q = search.toLowerCase()
+      filtered = filtered.filter(
+        (r) =>
+          r.order.symbol.toLowerCase().includes(q) ||
+          r.order.account_id.toLowerCase().includes(q) ||
+          r.order.broker_id.toLowerCase().includes(q),
       )
     }
-    return filtered
-  }, [results, detailFilters])
+    if (market) filtered = filtered.filter((r) => r.order.market === market)
+    if (side) filtered = filtered.filter((r) => r.order.side === side)
+    if (ruleId)
+      filtered = filtered.filter((r) => r.flags.some((f) => f.rule_id === ruleId))
+    if (account)
+      filtered = filtered.filter((r) => r.order.account_id.includes(account))
+    if (broker)
+      filtered = filtered.filter((r) => r.order.broker_id.includes(broker))
+    if (status)
+      filtered = filtered.filter((r) => r.order.order_status === status)
+    if (reviewStatusFilter !== 'ALL') {
+      filtered = filtered.filter((r) => r.review_status === reviewStatusFilter)
+    }
 
-  const effectiveSelected = useMemo(() => {
-    return filteredResults.find(r => r.order.order_id === selectedId) ?? filteredResults[0] ?? null
+    return filtered
+  }, [riskResults, detailFilters, reviewStatusFilter])
+
+  // ---------------------------------------------------------------------------
+  // Derived: auto-select first item if current selection is not visible
+  // ---------------------------------------------------------------------------
+  const selectedResult = useMemo(() => {
+    return (
+      filteredResults.find((r) => r.order.order_id === selectedId) ??
+      filteredResults[0] ??
+      null
+    )
   }, [filteredResults, selectedId])
 
-  const handleBatchMark = useCallback((status: ReviewStatus) => {
-    batchUpdateReviewStatus([...checkedIds], status)
-    setCheckedIds(new Set())
-  }, [batchUpdateReviewStatus, checkedIds])
+  const effectiveSelectedId = selectedResult?.order.order_id ?? null
 
-  const handleSelect = useCallback((id: string) => setSelectedId(id), [])
+  // ---------------------------------------------------------------------------
+  // Summary stats (for empty-state panel)
+  // ---------------------------------------------------------------------------
+  const summaryStats = useMemo(
+    () => ({
+      total: riskResults.length,
+      high: riskResults.filter((r) => r.highest_severity === 'HIGH').length,
+      medium: riskResults.filter((r) => r.highest_severity === 'MEDIUM').length,
+      low: riskResults.filter((r) => r.highest_severity === 'LOW').length,
+    }),
+    [riskResults],
+  )
+
+  // ---------------------------------------------------------------------------
+  // Active advanced filter count (for QuickFilters badge)
+  // ---------------------------------------------------------------------------
+  const activeAdvancedCount = useMemo(() => {
+    let count = 0
+    if (detailFilters.ruleId) count++
+    if (detailFilters.account) count++
+    if (detailFilters.broker) count++
+    if (detailFilters.status) count++
+    if (reviewStatusFilter !== 'ALL') count++
+    return count
+  }, [detailFilters.ruleId, detailFilters.account, detailFilters.broker, detailFilters.status, reviewStatusFilter])
+
+  // ---------------------------------------------------------------------------
+  // Current note for selected order
+  // ---------------------------------------------------------------------------
+  const currentNote = useMemo(() => {
+    if (!effectiveSelectedId) return ''
+    return notes[effectiveSelectedId] ?? ''
+  }, [notes, effectiveSelectedId])
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+  const handleSelect = useCallback(
+    (id: string) => {
+      setSelectedId(id)
+      setLastCheckedId(id)
+    },
+    [],
+  )
 
   const handleToggleCheck = useCallback((id: string, checked: boolean) => {
-    setCheckedIds(prev => {
+    setCheckedIds((prev) => {
       const next = new Set(prev)
       if (checked) next.add(id)
       else next.delete(id)
       return next
     })
+    setLastCheckedId(id)
   }, [])
 
+  const handleShiftClick = useCallback(
+    (_e: React.MouseEvent, id: string) => {
+      if (!lastCheckedId) return
+      const ids = filteredResults.map((r) => r.order.order_id)
+      const start = ids.indexOf(lastCheckedId)
+      const end = ids.indexOf(id)
+      if (start === -1 || end === -1) return
+      const range = ids.slice(Math.min(start, end), Math.max(start, end) + 1)
+      setCheckedIds((prev) => new Set([...prev, ...range]))
+    },
+    [lastCheckedId, filteredResults],
+  )
+
+  const handleStatusChange = useCallback(
+    (orderId: string, status: ReviewStatus) => {
+      updateReviewStatus(orderId, status)
+    },
+    [updateReviewStatus],
+  )
+
+  const handleNoteChange = useCallback(
+    (orderId: string, note: string) => {
+      setNote(orderId, note)
+    },
+    [setNote],
+  )
+
+  const handleBatchMark = useCallback(
+    (ids: string[], status: ReviewStatus) => {
+      batchUpdateReviewStatus(ids, status)
+    },
+    [batchUpdateReviewStatus],
+  )
+
+  const handleBatchMarkFromBar = useCallback(
+    (status: ReviewStatus) => {
+      batchUpdateReviewStatus(Array.from(checkedIds), status)
+      setCheckedIds(new Set())
+    },
+    [batchUpdateReviewStatus, checkedIds],
+  )
+
+  const handleClearSelection = useCallback(() => {
+    setCheckedIds(new Set())
+  }, [])
+
+  const handleFilterFollowUp = useCallback(() => {
+    const current = useUiStore.getState().reviewStatusFilter
+    useUiStore
+      .getState()
+      .setReviewStatusFilter(current === 'FOLLOW_UP' ? 'ALL' : 'FOLLOW_UP')
+  }, [])
+
+  const handleToggleAdvanced = useCallback(() => {
+    setAdvancedFiltersOpen(!advancedFiltersOpen)
+  }, [setAdvancedFiltersOpen, advancedFiltersOpen])
+
+  const handleCloseAdvanced = useCallback(() => {
+    setAdvancedFiltersOpen(false)
+  }, [setAdvancedFiltersOpen])
+
+  const handleEscape = useCallback(() => {
+    // Clear selection when pressing Escape
+    setCheckedIds(new Set())
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Keyboard navigation
+  // ---------------------------------------------------------------------------
+  const filteredOrderIds = useMemo(
+    () => filteredResults.map((r) => r.order.order_id),
+    [filteredResults],
+  )
+
+  const getNextPendingId = useCallback(
+    (currentId: string) => {
+      const currentIdx = filteredOrderIds.indexOf(currentId)
+      for (let i = currentIdx + 1; i < filteredResults.length; i++) {
+        if (filteredResults[i].review_status === 'PENDING') {
+          return filteredResults[i].order.order_id
+        }
+      }
+      return null
+    },
+    [filteredResults, filteredOrderIds],
+  )
+
+  const { focusedIndex } = useKeyboardNavigation({
+    orderIds: filteredOrderIds,
+    selectedId: effectiveSelectedId,
+    onSelect: handleSelect,
+    onMarkReviewed: (id) => handleStatusChange(id, 'REVIEWED'),
+    onMarkFollowUp: (id) => handleStatusChange(id, 'FOLLOW_UP'),
+    onToggleCheck: (id) => handleToggleCheck(id, !checkedIds.has(id)),
+    onToggleGroup: () => {
+      // No-op for now — would need a ref to RiskOrderList's internal collapse state
+    },
+    onFocusSearch: () => searchRef.current?.focus(),
+    onEscape: handleEscape,
+    getNextPendingId,
+    listRef: listContainerRef,
+    enabled: true,
+  })
+
+  // ---------------------------------------------------------------------------
+  // Shared panel content (used in both mobile and desktop layouts)
+  // ---------------------------------------------------------------------------
+  const leftPanel = (
+    <div className="flex flex-col h-full">
+      <QuickFilters
+        searchRef={searchRef}
+        onToggleAdvanced={handleToggleAdvanced}
+        advancedOpen={advancedFiltersOpen}
+        activeAdvancedCount={activeAdvancedCount}
+      />
+      <AdvancedFilters isOpen={advancedFiltersOpen} onClose={handleCloseAdvanced} />
+      <ActiveFilterTags />
+      <div className="flex-1 overflow-hidden" ref={listContainerRef}>
+        <RiskOrderList
+          results={filteredResults}
+          selectedId={effectiveSelectedId}
+          focusedIndex={focusedIndex}
+          checkedIds={checkedIds}
+          onSelect={handleSelect}
+          onToggleCheck={handleToggleCheck}
+          onShiftClick={handleShiftClick}
+          onBatchMark={handleBatchMark}
+        />
+      </div>
+      <BatchActionBar
+        checkedCount={checkedIds.size}
+        onBatchMark={handleBatchMarkFromBar}
+        onClearSelection={handleClearSelection}
+      />
+    </div>
+  )
+
+  const rightPanel = (
+    <OrderDetailPanel
+      result={selectedResult}
+      allOrders={allOrders}
+      riskResults={riskResults}
+      note={currentNote}
+      onStatusChange={handleStatusChange}
+      onNoteChange={handleNoteChange}
+      onSelectOrder={handleSelect}
+      summaryStats={summaryStats}
+    />
+  )
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 border-b px-4 py-2.5 min-h-[52px]">
-        <FilterBar />
-        <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
-          {filteredResults.length} 条{filteredResults.length !== results.length && ` / ${results.length}`}
-        </span>
-      </div>
+      {/* Review Progress Bar — full width */}
+      <ReviewProgressBar
+        results={riskResults}
+        firstReviewAt={firstReviewAt}
+        lastReviewAt={lastReviewAt}
+        onFilterFollowUp={handleFilterFollowUp}
+      />
 
-      {checkedIds.size > 0 && (
-        <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-1.5">
-          <span className="text-sm font-medium">已选 {checkedIds.size} 项</span>
-          <div className="flex gap-1 ml-2">
-            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2" onClick={() => handleBatchMark('REVIEWED')}>
-              <CheckCircle className="h-3.5 w-3.5" /> 已审阅
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2" onClick={() => handleBatchMark('FOLLOW_UP')}>
-              <Flag className="h-3.5 w-3.5" /> 需跟进
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2" onClick={() => handleBatchMark('FALSE_POSITIVE')}>
-              <XCircle className="h-3.5 w-3.5" /> 误报
-            </Button>
-          </div>
-          <Button size="sm" variant="ghost" className="h-7 text-xs px-2 ml-auto" onClick={() => setCheckedIds(new Set())}>
-            取消
-          </Button>
+      {/* Resizable two-panel layout */}
+      {isMobile ? (
+        /* Stacked layout for mobile */
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="h-1/2 flex flex-col border-b">{leftPanel}</div>
+          <div className="flex-1 overflow-hidden">{rightPanel}</div>
         </div>
+      ) : (
+        <ResizablePanelGroup
+          orientation="horizontal"
+          className="flex-1"
+        >
+          <ResizablePanel defaultSize="35%" minSize="25%" maxSize="50%">
+            {leftPanel}
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize="65%">
+            {rightPanel}
+          </ResizablePanel>
+        </ResizablePanelGroup>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-[420px] shrink-0 border-r flex flex-col overflow-hidden">
-          <RiskOrderList
-            results={filteredResults}
-            selectedId={effectiveSelected?.order.order_id ?? null}
-            checkedIds={checkedIds}
-            onSelect={handleSelect}
-            onToggleCheck={handleToggleCheck}
-          />
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          {effectiveSelected ? (
-            <OrderDetailPanel result={effectiveSelected} />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                {results.length === 0 ? '暂无风险订单' : '选择一条订单查看详情'}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Keyboard shortcut hints */}
+      <ShortcutHintBar />
     </div>
   )
 }
