@@ -19,6 +19,14 @@ Trade Risk Monitor is a client-side SPA used by Hong Kong brokerage compliance t
 - Grouped review mode matching the severity-first workflow
 - Keyboard-driven efficiency for high-volume daily use
 
+### Localization
+
+The UI uses **Chinese** for all user-facing labels and domain terms (consistent with existing codebase). English is used only in code identifiers and this spec document. Mockups in this spec use Chinese labels as the canonical reference.
+
+### Data Model Constraints
+
+The `Order` type has `symbol: string` (code only, e.g., `0700.HK`) and `broker_id: string` (ID only, e.g., `B001`). There are no human-readable name fields for symbols or brokers in the CSV data. All mockups in this spec display these raw identifiers only.
+
 ---
 
 ## 1. Layout Structure
@@ -71,12 +79,12 @@ New component placed above the two-panel layout.
 
 ### Component: `ResizablePanel`
 
-The left panel becomes resizable:
+Use shadcn/ui's `ResizablePanelGroup` (built on `react-resizable-panels`) instead of a custom hook, to stay consistent with the design system:
 
-- Drag handle on the right edge of the left panel (vertical bar, cursor: col-resize)
-- Default: 400px, min: 320px, max: 600px
-- Width persisted in `uiStore` (Zustand)
-- On screens < 768px: full-width stacked layout (list above, detail below)
+- `ResizablePanelGroup` with `direction="horizontal"`, `ResizableHandle` between panels
+- Left panel: default 35%, min 25%, max 50% (translates to ~400px default on 1200px screen)
+- Width percentage persisted in `uiStore` (Zustand)
+- Uses existing `useIsMobile()` hook from `src/hooks/use-mobile.ts` (breakpoint: 768px) to switch to stacked layout on mobile
 
 ---
 
@@ -100,14 +108,14 @@ The left panel becomes resizable:
 ### Order Card (List Item)
 
 ```
-☐  ┃  0700.HK 中国移动          买入    14:32
-   ┃  A00123 · 张经纪           ¥2,450,000
+☐  ┃  0700.HK                   买入    14:32
+   ┃  A00123 · B001             ¥2,450,000
    ┃  R001 大额交易  R003 集中交易         ● 待审查
 ```
 
 - **Left border**: Color by severity (red/orange/yellow) — retained from current design
-- **Row 1**: Symbol + name, side (buy/sell), time — primary identification
-- **Row 2**: Account + broker, amount — context
+- **Row 1**: Symbol code, side (buy/sell), time — primary identification
+- **Row 2**: Account ID + broker ID, amount — context (raw IDs as per data model)
 - **Row 3**: Triggered rule tags + review status dot — decision info
 - **Card height**: ~96px (up from 82px) for better readability
 - **Active item**: Blue left highlight bar + light blue background
@@ -117,13 +125,25 @@ The left panel becomes resizable:
 
 Default sort within each group: **amount descending** (largest risk exposure first).
 
+> **Behavioral change note**: The current list renders results in risk engine output order (CSV row order). This redesign changes the default to amount-descending within each severity group. This applies within each group, not globally.
+
 Sortable alternatives (via dropdown in group header or a sort control):
 - By time (newest first)
 - By rule count (most rules triggered first)
 
-### Virtualization
+### Severity Filter Interaction
 
-Continue using `react-virtual` for each group's item list. Each group header is a sticky element within the scroll container.
+Since the list is already grouped by severity, the **severity dropdown is removed from filters**. Users collapse/expand groups instead of filtering by severity. If a user needs to focus on a single severity, they collapse the other two groups. This avoids the confusing state of "filtered to HIGH but seeing groups for MEDIUM and LOW."
+
+### Virtualization Strategy
+
+Use a **single `@tanstack/react-virtual` virtualizer** with mixed row types (not three separate virtualizers):
+
+- The flat item array contains both group headers and order cards
+- `estimateSize` returns different heights: ~48px for group headers, ~96px for order cards
+- Group headers use `position: sticky` within the scroll container
+- Collapsed groups contribute only their header row to the flat array (items omitted)
+- This is the same pattern as the current single-virtualizer approach, extended with header rows
 
 ---
 
@@ -137,7 +157,7 @@ Continue using `react-virtual` for each group's item list. Each group header is 
 [🔍 Search symbol/account...]   [Market ▼]  [Side ▼]  [⚙ More]
 ```
 
-- Search box: fuzzy match on symbol code, symbol name, account number, broker name
+- Search box: fuzzy match on symbol code, account ID, broker ID (fields available in Order type)
 - Market dropdown: All / HK / US
 - Side dropdown: All / Buy / Sell
 - "More" button to toggle advanced panel
@@ -145,15 +165,17 @@ Continue using `react-virtual` for each group's item list. Each group header is 
 **Advanced filter panel (expandable):**
 
 ```
-Rule type: [R001 ▼]     Account: [search input...]
-Broker:    [search input...]  Status: [All / Pending / Reviewed / Follow-up]
+规则类型: [R001 ▼]        账户: [搜索输入...]
+经纪人:   [搜索输入...]   订单状态: [全部/成交/已撤單/...]
+审查状态: [全部/待审/已审/需跟进/误报]
 
-[Reset all]                                  [Collapse]
+[重置全部]                                   [收起]
 ```
 
 - Expands below the quick filter bar, above the grouped list
 - 2-column grid layout
-- Status filter includes review states
+- **订单状态 (Order Status)**: Filters by `order_status` field (成交, 已撤單, etc.) — renamed from the ambiguous "Status" in the current filter bar
+- **审查状态 (Review Status)**: New filter for review workflow states (`PENDING` / `REVIEWED` / `FOLLOW_UP` / `FALSE_POSITIVE`)
 
 ### Active Filter Indicators
 
@@ -176,10 +198,12 @@ Active filters: [Market: HK ×] [Side: Buy ×] [Rule: R001 ×]   Clear all
 ### State Management
 
 All filter state stored in `uiStore` (Zustand). Current uiStore already tracks most filters — extend with:
-- `reviewStatus: 'all' | 'pending' | 'reviewed' | 'followUp'`
+- `reviewStatusFilter: 'ALL' | 'PENDING' | 'REVIEWED' | 'FOLLOW_UP' | 'FALSE_POSITIVE'` (uses existing `ReviewStatus` enum values, plus `'ALL'`)
 - `sortBy: 'amount' | 'time' | 'ruleCount'`
 - `advancedFiltersOpen: boolean`
-- `leftPanelWidth: number`
+- `leftPanelWidth: number` (percentage, persisted)
+
+Note: The existing `detailFilters.severity` field is **removed** since severity is now handled by group collapse/expand state (stored in component state, not Zustand).
 
 ---
 
@@ -192,35 +216,35 @@ All filter state stored in `uiStore` (Zustand). Current uiStore already tracks m
 ### Redesigned: 4-Zone Card Layout
 
 ```
-┌─ Order Detail ───────────────────────────────────┐
+┌─ 订单详情 ───────────────────────────────────────┐
 │                                                   │
-│  ┌─ Order Summary ─────────────────────────────┐  │
-│  │  0700.HK 中国移动              HIGH 严重     │  │
+│  ┌─ 订单概要 ──────────────────────────────────┐  │
+│  │  0700.HK                       HIGH 严重     │  │
 │  │  买入 · 开仓 · 港股                          │  │
 │  │                                              │  │
-│  │  Amount      Qty        Price      Time      │  │
-│  │  ¥2,450,000  5,000      ¥490.00   14:32     │  │
+│  │  金额        数量        价格       时间      │  │
+│  │  ¥2,450,000  5,000股    ¥490.00   14:32     │  │
 │  │                                              │  │
-│  │  Account A00123  Broker 张三  Order ORD-789  │  │
+│  │  账户 A00123  经纪人 B001  订单号 ORD-789    │  │
 │  └──────────────────────────────────────────────┘  │
 │                                                   │
-│  ┌─ Triggered Rules (3) ────────────────────────┐  │
-│  │  ⚠ R001 Large Transaction                    │  │
-│  │  Amount ¥2,450,000 exceeds threshold ¥2M     │  │
+│  ┌─ 触发规则 (3) ──────────────────────────────┐  │
+│  │  ⚠ R001 大额交易                             │  │
+│  │  交易金额 ¥2,450,000 超过阈值 ¥2,000,000     │  │
 │  │                                              │  │
-│  │  ⚠ R003 Concentrated Trading                 │  │
-│  │  Same-day same-symbol ratio: 15.2%           │  │
+│  │  ⚠ R003 集中交易                             │  │
+│  │  该账户当日同标的累计交易占比 15.2%            │  │
 │  │                                              │  │
-│  │  ⚠ R006 Wash Trading                         │  │
-│  │  Related order: ORD-456 (Sell) [click→jump]  │  │
+│  │  ⚠ R006 对倒交易                             │  │
+│  │  关联订单: ORD-456 (卖出) [点击跳转]          │  │
 │  └──────────────────────────────────────────────┘  │
 │                                                   │
-│  ┌─ Related Trades ── [Same Account] [Same Sym] ┐  │
-│  │  (Tab switch, table content)                  │  │
+│  ┌─ 关联交易 ──── [同账户] [同标的] ────────────┐  │
+│  │  (Tab 切换，表格内容)                         │  │
 │  └──────────────────────────────────────────────┘  │
 │                                                   │
-│  ┌─ Review Actions ─────────────────────────────┐  │
-│  │  [✓ Mark Reviewed]  [⚑ Follow-up]  [Note...] │  │
+│  ┌─ 审查操作 ──────────────────────────────────┐  │
+│  │  [✓ 已审] [⚑ 需跟进] [✗ 误报] [备注...]    │  │
 │  └──────────────────────────────────────────────┘  │
 │                                                   │
 └───────────────────────────────────────────────────┘
@@ -228,10 +252,10 @@ All filter state stored in `uiStore` (Zustand). Current uiStore already tracks m
 
 ### Zone 1: Order Summary
 
-- **Header line**: Symbol code + name (text-lg font-semibold) + severity badge (right-aligned)
+- **Header line**: Symbol code (text-lg font-semibold) + severity badge (right-aligned)
 - **Sub-header**: Side + open/close + market (text-sm muted)
 - **Key metrics row**: Amount, quantity, price, time — in a 4-column grid with labels above values. Values use `font-mono tabular-nums` for alignment. Amount uses `text-base font-semibold`.
-- **Secondary info**: Account, broker, order ID — smaller text (text-xs muted), single row
+- **Secondary info**: Account ID, broker ID, order ID — smaller text (text-xs muted), single row. These are raw IDs from the data model (no name lookup).
 
 ### Zone 2: Triggered Rules
 
@@ -244,17 +268,23 @@ All filter state stored in `uiStore` (Zustand). Current uiStore already tracks m
 
 ### Zone 3: Related Trades
 
-- Tab component: "Same Account" / "Same Symbol"
+- Tab component: "同账户" / "同标的"
 - Compact table: Time, Side, Symbol, Qty, Amount, Status
-- Max 10 rows shown, "Show all N" link if more
+- Max 10 rows shown, sorted by time descending (most recent first), "Show all N" link if more
 - Table has sticky header
+- Pulls from `orderStore.orders` (includes non-risk-flagged orders for context)
 
 ### Zone 4: Review Actions
 
 - **Sticky at panel bottom** — always visible without scrolling
-- Three actions: Mark Reviewed (primary button), Follow-up (outline button), Note (text input that expands on focus)
-- Note field: single-line input, expands to textarea on focus, saves on blur
-- After marking reviewed, button changes to "✓ Reviewed" (disabled state) with undo option (5s timeout)
+- Four actions matching existing `ReviewStatus` enum:
+  - **已审�� (Mark Reviewed)**: Primary button — confirms order has been reviewed and is acceptable
+  - **需跟进 (Follow-up)**: Outline button — order needs further investigation
+  - **误报 (False Positive)**: Ghost/subtle button — risk flag is a false alarm
+  - **备注 (Note)**: Text input that expands on focus
+- Note field: single-line input, expands to 3-line textarea on focus, saves on blur, max 500 characters. Notes are standalone (not tied to a specific review action). Notes are **not** searchable via the search filter (to keep search fast).
+- After marking any status, button changes to active state with undo option via toast (5s timeout)
+- Toast notifications use `sonner` (new dependency) — consistent with shadcn/ui ecosystem
 
 ### Empty State
 
@@ -297,7 +327,8 @@ When no order is selected, show:
 - Focus item has a visible **focus ring** (`ring-2 ring-primary`)
 - Keyboard navigation auto-scrolls the focused item to the **center of the visible area**
 - Detail panel updates automatically when focus changes via keyboard
-- Keyboard shortcuts are only active when the Detail page is focused (not when search input or note field is focused)
+- Keyboard shortcuts are only active when the **list panel** has focus (not when search input, note field, or other form elements are focused)
+- **Focus flow**: `Tab` moves focus from list to search box to filters; `Esc` from any input returns focus to the list. Clicking a list item also returns focus to the list.
 
 ### Quick Review Flow
 
@@ -314,13 +345,13 @@ This enables a rapid `review → Enter → review → Enter` workflow.
 **Batch action bar** (fixed at list bottom, visible when items are checked):
 
 ```
-Selected: 12 items    [✓ Batch Review]  [⚑ Batch Follow-up]  [✕ Cancel]
+已选 12 项    [✓ 批量已审]  [⚑ 批量跟进]  [✗ 批量误报]  [取消选择]
 ```
 
-- Group header "Select All" checks all items in that severity group
+- Group header "全选" checks all items in that severity group
 - `Shift+click` for range selection (from last checked to current)
-- Batch actions show a **confirmation dialog**: "Mark 12 orders as reviewed? [Confirm] [Cancel]"
-- After batch operation: toast "12 orders marked as reviewed", all items uncheck, progress updates
+- Batch actions show a **confirmation dialog** (shadcn `AlertDialog` for proper focus trapping and `Esc` to cancel): "确定将 12 条订单标记为已审查？ [确定] [取消]"
+- After batch operation: toast "已将 12 条订单标记为已审查", all items uncheck, progress updates
 
 ### Shortcut Hint Bar
 
@@ -350,7 +381,7 @@ Located at the top of the Detail page, spanning full width:
 
 - **Segmented bar**: Three colored segments (red, orange, yellow) proportional to each group's total count. Filled portion represents reviewed items.
 - **Animation**: Smooth width transition (300ms ease) on each review action
-- **Follow-up count**: Clickable — applies a filter to show only follow-up items
+- **Follow-up count**: Clickable — sets `reviewStatusFilter` to `'FOLLOW_UP'`. Clicking again resets to `'ALL'` (toggle behavior).
 - **Completion state**: When all reviewed, bar turns green with checkmark
 
 ### List Item Visual States
@@ -369,7 +400,7 @@ Located at the top of the Detail page, spanning full width:
 
 ### Group Completion
 
-When all items in a severity group are reviewed:
+When all items in a severity group are reviewed (any terminal status: REVIEWED, FOLLOW_UP, or FALSE_POSITIVE):
 
 ```
 ✓ HIGH 严重 (45/45) — 全部完成
@@ -378,6 +409,7 @@ When all items in a severity group are reviewed:
 - Group header gets a green checkmark icon
 - Header text color changes to muted green
 - Group auto-collapses (with animation) to save space
+- **Focus after group completion**: Focus automatically moves to the first pending item in the next group. If all groups are complete, focus stays on the last reviewed item.
 
 ### Full Completion State
 
@@ -397,8 +429,20 @@ When all 532 orders are reviewed:
 
 ### Review State Persistence
 
-- Review status (pending/reviewed/follow-up) and notes stored in `riskStore` (Zustand)
-- Included in report export (PDF/CSV) as additional columns
+Review data is stored in `riskStore` (Zustand) with the following additions to the store:
+
+```typescript
+// Added to riskStore
+notes: Record<string, string>;           // orderId → note text (max 500 chars)
+reviewTimestamps: Record<string, string>; // orderId → ISO 8601 timestamp of last status change
+firstReviewAt: string | null;            // ISO timestamp of the first review action in this session
+lastReviewAt: string | null;             // ISO timestamp of the most recent review action
+```
+
+- `review_status` remains on `RiskResult` (existing field)
+- `reviewTimestamps` records when each order's status was last changed — used for the completion time calculation
+- `firstReviewAt` / `lastReviewAt` are session-level — used to compute elapsed time in the completion state
+- All review data included in report export (PDF/CSV) as additional columns
 - Persisted across page navigation within the session
 - Saved to IndexedDB when session is saved to history
 
@@ -408,11 +452,11 @@ When all 532 orders are reviewed:
 
 While mobile is a separate phase, the Detail page redesign should be **responsive-ready**:
 
-- **< 768px**: Stacked layout (list full-width above, detail below as a slide-up sheet)
-- **768–1024px**: Side-by-side with left panel at minimum width (320px)
+- **< 768px** (matches existing `MOBILE_BREAKPOINT` in `src/hooks/use-mobile.ts`): Stacked layout (list full-width above, detail below as a slide-up sheet)
+- **768–1024px**: Side-by-side with left panel at minimum width (25%)
 - **> 1024px**: Full two-panel layout with resizable divider
 
-The left panel resize handle is hidden on mobile (< 768px) where the panel takes full width.
+The resize handle is hidden on mobile (< 768px) where panels stack vertically. The existing `useIsMobile()` hook is used for this check — no new breakpoint constants.
 
 ---
 
@@ -431,7 +475,6 @@ The left panel resize handle is hidden on mobile (< 768px) where the panel takes
 | `ReviewActions` | `src/components/detail/` | Sticky review action bar in detail panel |
 | `ShortcutHintBar` | `src/components/detail/` | Keyboard shortcut hints |
 | `useKeyboardNavigation` | `src/hooks/` | Custom hook for keyboard navigation logic |
-| `useResizablePanel` | `src/hooks/` | Custom hook for panel resize drag handling |
 
 ### Modified Components
 
@@ -446,8 +489,15 @@ The left panel resize handle is hidden on mobile (< 768px) where the panel takes
 
 | Store | Changes |
 |-------|---------|
-| `uiStore` | Add: `reviewStatus`, `sortBy`, `advancedFiltersOpen`, `leftPanelWidth`, `shortcutHintsVisible` |
-| `riskStore` | Add: `notes` map (orderId → string), review timestamp tracking |
+| `uiStore` | Add: `reviewStatusFilter`, `sortBy`, `advancedFiltersOpen`, `leftPanelWidth`, `shortcutHintsVisible`. Remove: `detailFilters.severity` (replaced by group collapse). |
+| `riskStore` | Add: `notes` map (orderId → string), `reviewTimestamps` map (orderId → ISO timestamp), `firstReviewAt`, `lastReviewAt` |
+
+### New Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `sonner` | Toast notifications (shadcn/ui ecosystem compatible) |
+| `react-resizable-panels` | Resizable panel layout (used by shadcn/ui's Resizable component) |
 
 ---
 
