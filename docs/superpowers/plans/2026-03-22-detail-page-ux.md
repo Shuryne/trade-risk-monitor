@@ -574,7 +574,12 @@ Sorting: use `useUiStore` to read `sortBy` and sort within each group accordingl
 
 Group auto-complete detection: if all items in a group are non-PENDING, show completion state and auto-collapse (with a `useEffect` that runs when review statuses change).
 
-**Collapse/expand animation** (150ms per spec): Use the existing `Collapsible` component from `src/components/ui/collapsible.tsx` to wrap each group's items. This provides built-in open/close animation. The `CollapsibleContent` handles height transition automatically.
+**Collapse/expand animation** (150ms per spec): Since the virtualizer uses absolute positioning and a flat row array, `Collapsible` cannot be used here (it's incompatible with virtualized lists). Instead, animate the collapse by:
+1. When collapsing: instantly remove item rows from the `ListRow[]` flat array (the virtualizer recalculates total size)
+2. Apply `transition-[height] duration-150` on the virtualizer's scroll container div so the height change animates smoothly
+3. This gives the visual effect of the group "shrinking" over 150ms
+
+Note: `Collapsible` from `src/components/ui/collapsible.tsx` IS used in Task 6 for the AdvancedFilters panel (standard DOM, not virtualized) — that usage is correct.
 
 - [ ] **Step 3: Wire up selection and virtualization**
 
