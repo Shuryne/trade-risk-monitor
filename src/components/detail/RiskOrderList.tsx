@@ -140,8 +140,15 @@ export const RiskOrderList = memo(function RiskOrderList({
   }, [groupedResults])
 
   // ---- Build flat rows for virtualizer ----
-  const flatRows = useMemo<ListRow[]>(() => {
+  // Also build a mapping from order-index to flatRow-index so we can
+  // translate focusedIndex (order-space) to flatRow-space for scrolling,
+  // and track each item row's order-index for the isFocused comparison.
+  const { flatRows, orderIndexToFlatRow, flatRowToOrderIndex } = useMemo(() => {
     const rows: ListRow[] = []
+    const oToF: Map<number, number> = new Map()
+    const fToO: Map<number, number> = new Map()
+    let orderIdx = 0
+
     for (const sev of SEVERITY_ORDER) {
       const groupResults = groupedResults[sev]
       if (groupResults.length === 0) continue
@@ -150,11 +157,18 @@ export const RiskOrderList = memo(function RiskOrderList({
 
       if (!collapsed[sev]) {
         for (const result of groupResults) {
+          const flatIdx = rows.length
+          oToF.set(orderIdx, flatIdx)
+          fToO.set(flatIdx, orderIdx)
           rows.push({ type: 'item', result })
+          orderIdx++
         }
+      } else {
+        // Even when collapsed, advance order index so the mapping stays consistent
+        orderIdx += groupResults.length
       }
     }
-    return rows
+    return { flatRows: rows, orderIndexToFlatRow: oToF, flatRowToOrderIndex: fToO }
   }, [groupedResults, collapsed])
 
   // ---- Virtualizer ----
@@ -167,10 +181,11 @@ export const RiskOrderList = memo(function RiskOrderList({
 
   // ---- Scroll to focused index ----
   useEffect(() => {
-    if (focusedIndex >= 0 && focusedIndex < flatRows.length) {
-      virtualizer.scrollToIndex(focusedIndex, { align: 'center' })
+    const flatIdx = orderIndexToFlatRow.get(focusedIndex)
+    if (flatIdx !== undefined) {
+      virtualizer.scrollToIndex(flatIdx, { align: 'center' })
     }
-  }, [focusedIndex, flatRows.length, virtualizer])
+  }, [focusedIndex, orderIndexToFlatRow, virtualizer])
 
   // ---- Empty state ----
   if (results.length === 0) {
@@ -212,7 +227,7 @@ export const RiskOrderList = memo(function RiskOrderList({
                 <OrderCard
                   result={row.result}
                   isActive={row.result.order.order_id === selectedId}
-                  isFocused={virtualItem.index === focusedIndex}
+                  isFocused={flatRowToOrderIndex.get(virtualItem.index) === focusedIndex}
                   isChecked={checkedIds.has(row.result.order.order_id)}
                   onSelect={onSelect}
                   onToggleCheck={onToggleCheck}

@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils'
 interface OrderDetailPanelProps {
   result: RiskResult | null;
   allOrders: Order[];
-  riskResults: RiskResult[];
   note: string;
   onStatusChange: (orderId: string, status: ReviewStatus) => void;
   onNoteChange: (orderId: string, note: string) => void;

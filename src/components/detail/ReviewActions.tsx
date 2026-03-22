@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Check, Flag, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,11 @@ const ReviewActions = memo(function ReviewActions({
   // Local textarea state for expansion on focus
   const [textareaRows, setTextareaRows] = useState(1);
   const [localNote, setLocalNote] = useState(note);
+
+  // Sync localNote when the note prop changes (e.g. switching orders)
+  useEffect(() => {
+    setLocalNote(note);
+  }, [note]);
 
   const handleStatusClick = (status: ReviewStatus) => {
     // Toggle: clicking the active status reverts to PENDING

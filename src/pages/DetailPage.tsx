@@ -216,8 +216,14 @@ export default function DetailPage() {
   }, [setAdvancedFiltersOpen])
 
   const handleEscape = useCallback(() => {
-    // Clear selection when pressing Escape
-    setCheckedIds(new Set())
+    const store = useUiStore.getState()
+    if (store.advancedFiltersOpen) {
+      store.setAdvancedFiltersOpen(false)
+    } else if (store.detailFilters.search) {
+      store.setDetailFilter('search', '')
+    } else {
+      setCheckedIds(new Set())
+    }
   }, [])
 
   // ---------------------------------------------------------------------------
@@ -295,7 +301,6 @@ export default function DetailPage() {
     <OrderDetailPanel
       result={selectedResult}
       allOrders={allOrders}
-      riskResults={riskResults}
       note={currentNote}
       onStatusChange={handleStatusChange}
       onNoteChange={handleNoteChange}
@@ -328,6 +333,7 @@ export default function DetailPage() {
         <ResizablePanelGroup
           orientation="horizontal"
           className="flex-1"
+          id="detail-panel"
         >
           <ResizablePanel defaultSize="35%" minSize="25%" maxSize="50%">
             {leftPanel}
