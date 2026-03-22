@@ -26,17 +26,6 @@ export const FilterBar = memo(function FilterBar() {
       </div>
 
       <CompactSelect
-        placeholder="风险等级"
-        value={detailFilters.severity}
-        onValueChange={v => setDetailFilter('severity', v)}
-        options={[
-          { value: 'HIGH', label: '高风险' },
-          { value: 'MEDIUM', label: '中风险' },
-          { value: 'LOW', label: '低风险' },
-        ]}
-      />
-
-      <CompactSelect
         placeholder="风险规则"
         value={detailFilters.ruleId}
         onValueChange={v => setDetailFilter('ruleId', v)}

@@ -17,7 +17,6 @@ export default function DetailPage() {
 
   const filteredResults = useMemo(() => {
     let filtered = results
-    if (detailFilters.severity) filtered = filtered.filter(r => r.highest_severity === detailFilters.severity)
     if (detailFilters.ruleId) filtered = filtered.filter(r => r.flags.some(f => f.rule_id === detailFilters.ruleId))
     if (detailFilters.market) filtered = filtered.filter(r => r.order.market === detailFilters.market)
     if (detailFilters.side) filtered = filtered.filter(r => r.order.side === detailFilters.side)
