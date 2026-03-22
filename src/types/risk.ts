@@ -1,4 +1,4 @@
-import type { Order, Market } from './order'
+import type { Order } from './order'
 import type { RuleConfig, RuleSeverity } from './rule'
 
 /** 单条风险标记 */

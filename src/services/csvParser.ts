@@ -125,7 +125,7 @@ function removeBOM(text: string): string {
 function mapFields(rawRow: RawCsvRow): Record<string, string> {
   const mapped: Record<string, string> = {}
   for (const [zhKey, enKey] of Object.entries(COLUMN_MAPPING)) {
-    const value = (rawRow as Record<string, string>)[zhKey]
+    const value = (rawRow as unknown as Record<string, string>)[zhKey]
     mapped[enKey] = value ?? ''
   }
   return mapped
