@@ -2,24 +2,19 @@ import type { Order } from '@/types/order'
 import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
+import { groupOrdersBy, paramAsNumber } from '../utils'
 import dayjs from 'dayjs'
 
 /** R002: 高频交易检测 — 同一账户在 N 分钟内下单次数超过阈值 */
 export const highFrequencyRule: RuleExecutor = {
   ruleId: 'R002',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const windowMinutes = Number(config.params['time_window_minutes']) || 5
-    const countThreshold = Number(config.params['order_count_threshold']) || 10
+    const windowMinutes = paramAsNumber(config, 'time_window_minutes', 5)
+    const countThreshold = paramAsNumber(config, 'order_count_threshold', 10)
     const flags: RiskFlag[] = []
     const flaggedOrderIds = new Set<string>()
 
-    // 按账户分组
-    const byAccount = new Map<string, Order[]>()
-    for (const order of orders) {
-      const list = byAccount.get(order.account_id) ?? []
-      list.push(order)
-      byAccount.set(order.account_id, list)
-    }
+    const byAccount = groupOrdersBy(orders, o => o.account_id)
 
     for (const [accountId, accountOrders] of byAccount) {
       if (accountOrders.length < countThreshold) continue

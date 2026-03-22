@@ -3,21 +3,16 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatPercent } from '@/utils/formatters'
-import { isExecutedOrder } from '../utils'
+import { isExecutedOrder, groupOrdersBy, paramAsNumber } from '../utils'
 
 /** R003: 单账户集中度 — 按市场分别计算，仅统计已成交订单金额 */
 export const accountConcentrationRule: RuleExecutor = {
   ruleId: 'R003',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const threshold = Number(config.params['concentration_threshold']) || 0.35
+    const threshold = paramAsNumber(config, 'concentration_threshold', 0.35)
     const flags: RiskFlag[] = []
 
-    const byMarket = new Map<string, Order[]>()
-    for (const order of orders) {
-      const list = byMarket.get(order.market) ?? []
-      list.push(order)
-      byMarket.set(order.market, list)
-    }
+    const byMarket = groupOrdersBy(orders, o => o.market)
 
     for (const [market, marketOrders] of byMarket) {
       let totalAmount = 0

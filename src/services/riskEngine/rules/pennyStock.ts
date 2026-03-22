@@ -3,13 +3,14 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatAmount } from '@/utils/formatters'
+import { paramAsNumber } from '../utils'
 
 /** R008: Penny Stock 交易 — 低价股的大额交易（仅 HK 市场） */
 export const pennyStockRule: RuleExecutor = {
   ruleId: 'R008',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const priceThreshold = Number(config.params['price_threshold']) || 1
-    const amountThreshold = Number(config.params['amount_threshold_hk']) || 500_000
+    const priceThreshold = paramAsNumber(config, 'price_threshold', 1)
+    const amountThreshold = paramAsNumber(config, 'amount_threshold_hk', 500_000)
     const flags: RiskFlag[] = []
 
     for (const order of orders) {

@@ -3,13 +3,14 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatAmount } from '@/utils/formatters'
+import { paramAsNumber } from '../utils'
 
 /** R001: 大额交易检测 — 单笔委托金额超过阈值（按市场分别设置） */
 export const largeOrderRule: RuleExecutor = {
   ruleId: 'R001',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const thresholdHK = Number(config.params['threshold_hk']) || 5_000_000
-    const thresholdUS = Number(config.params['threshold_us']) || 1_000_000
+    const thresholdHK = paramAsNumber(config, 'threshold_hk', 5_000_000)
+    const thresholdUS = paramAsNumber(config, 'threshold_us', 1_000_000)
     const flags: RiskFlag[] = []
 
     for (const order of orders) {

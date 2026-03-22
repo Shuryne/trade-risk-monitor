@@ -3,13 +3,13 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatPercent } from '@/utils/formatters'
-import { isExecutedOrder } from '../utils'
+import { isExecutedOrder, paramAsNumber } from '../utils'
 
 /** R005: 成交价格偏离 — 成交均价偏离委托价格超过阈值（含部分成交） */
 export const priceDeviationRule: RuleExecutor = {
   ruleId: 'R005',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const threshold = Number(config.params['deviation_threshold']) || 0.05
+    const threshold = paramAsNumber(config, 'deviation_threshold', 0.05)
     const flags: RiskFlag[] = []
 
     for (const order of orders) {

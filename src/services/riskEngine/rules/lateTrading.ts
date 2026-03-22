@@ -4,14 +4,15 @@ import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { isAfterHKT } from '@/utils/timezone'
 import { formatAmount } from '@/utils/formatters'
+import { paramAsNumber } from '../utils'
 
 /** R007: 尾盘异常交易 — 港股收盘前 N 分钟内的大额委托（仅 HK 市场） */
 export const lateTradingRule: RuleExecutor = {
   ruleId: 'R007',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const hour = Number(config.params['late_trading_hour']) || 15
-    const minute = Number(config.params['late_trading_minute']) || 45
-    const thresholdHK = Number(config.params['threshold_hk']) || 1_000_000
+    const hour = paramAsNumber(config, 'late_trading_hour', 15)
+    const minute = paramAsNumber(config, 'late_trading_minute', 45)
+    const thresholdHK = paramAsNumber(config, 'threshold_hk', 1_000_000)
     const flags: RiskFlag[] = []
 
     for (const order of orders) {

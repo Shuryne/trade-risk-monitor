@@ -3,22 +3,17 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatPercent } from '@/utils/formatters'
+import { groupOrdersBy, paramAsNumber } from '../utils'
 
 /** R009: 撤单率异常 — 同一账户当日撤单比例超过阈值（至少 N 笔订单） */
 export const cancelRateRule: RuleExecutor = {
   ruleId: 'R009',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const rateThreshold = Number(config.params['cancel_rate_threshold']) || 0.50
-    const minOrderCount = Number(config.params['min_order_count']) || 5
+    const rateThreshold = paramAsNumber(config, 'cancel_rate_threshold', 0.50)
+    const minOrderCount = paramAsNumber(config, 'min_order_count', 5)
     const flags: RiskFlag[] = []
 
-    // 按账户分组
-    const byAccount = new Map<string, Order[]>()
-    for (const order of orders) {
-      const list = byAccount.get(order.account_id) ?? []
-      list.push(order)
-      byAccount.set(order.account_id, list)
-    }
+    const byAccount = groupOrdersBy(orders, o => o.account_id)
 
     for (const [accountId, accountOrders] of byAccount) {
       if (accountOrders.length < minOrderCount) continue
