@@ -52,10 +52,6 @@ export default function UploadPage() {
       orders,
       risk_results: results,
       rule_config: configs,
-      notes: useRiskStore.getState().notes,
-      reviewTimestamps: useRiskStore.getState().reviewTimestamps,
-      firstReviewAt: useRiskStore.getState().firstReviewAt,
-      lastReviewAt: useRiskStore.getState().lastReviewAt,
     }
     storageService.saveSession(session)
 
