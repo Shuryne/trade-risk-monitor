@@ -4,30 +4,35 @@ import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { minutesDiff } from '@/utils/timezone'
 import { formatPercent } from '@/utils/formatters'
+import { isExecutedOrder } from '../utils'
 
 /**
  * R006: 对敲交易检测
- * 不同账户在短时间窗口内对同一标的进行方向相反、数量相近的交易。
+ * 不同账户在短时间窗口内对同一标的进行方向相反、数量相近的已成交交易。
  * 两笔订单都被标记，互相引用为 related_orders。
  */
 export const washTradingRule: RuleExecutor = {
   ruleId: 'R006',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
     const windowMinutes = Number(config.params['time_window_minutes']) || 2
-    const qtyDeviationThreshold = Number(config.params['quantity_deviation_threshold']) || 0.10
+    const qtyDeviationThreshold = Number(config.params['quantity_deviation_threshold']) || 0.05
+    const minAmountHK = Number(config.params['min_amount_hk']) || 500_000
+    const minAmountUS = Number(config.params['min_amount_us']) || 100_000
     const flags: RiskFlag[] = []
-    const flaggedPairs = new Set<string>() // 避免重复标记
+    const flaggedPairs = new Set<string>()
+
+    // 仅匹配已成交订单
+    const executedOrders = orders.filter(isExecutedOrder)
 
     // 按标的分组
     const bySymbol = new Map<string, Order[]>()
-    for (const order of orders) {
+    for (const order of executedOrders) {
       const list = bySymbol.get(order.symbol) ?? []
       list.push(order)
       bySymbol.set(order.symbol, list)
     }
 
     for (const [symbol, symbolOrders] of bySymbol) {
-      // 对每对不同账户、方向相反的订单检查
       for (let i = 0; i < symbolOrders.length; i++) {
         for (let j = i + 1; j < symbolOrders.length; j++) {
           const a = symbolOrders[i]
@@ -37,6 +42,10 @@ export const washTradingRule: RuleExecutor = {
           if (a.account_id === b.account_id) continue
           // 必须方向相反
           if (a.side === b.side) continue
+
+          // 最小金额门槛
+          const minAmount = a.market === 'HK' ? minAmountHK : minAmountUS
+          if (a.order_amount < minAmount || b.order_amount < minAmount) continue
 
           // 时间窗口检查
           const timeDiff = minutesDiff(a.order_time, b.order_time)
@@ -62,7 +71,6 @@ export const washTradingRule: RuleExecutor = {
             description: desc,
             related_orders: [a.order_id, b.order_id],
           })
-          // 为 b 也生成一条（两笔都标记）
           flags.push({
             rule_id: config.rule_id,
             rule_name: config.name,

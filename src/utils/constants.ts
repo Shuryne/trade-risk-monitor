@@ -92,27 +92,27 @@ export const DEFAULT_RULE_CONFIGS: RuleConfig[] = [
     severity: 'MEDIUM',
     params: {
       time_window_minutes: 5,
-      order_count_threshold: 10,
+      order_count_threshold: 20,
     },
   },
   {
     rule_id: 'R003',
     name: '单账户集中度',
-    description: '单一账户委托总金额占比超过阈值（按市场分别计算）',
+    description: '单一账户已成交金额占比超过阈值（按市场分别计算）',
     enabled: true,
     severity: 'MEDIUM',
     params: {
-      concentration_threshold: 0.25,
+      concentration_threshold: 0.35,
     },
   },
   {
     rule_id: 'R004',
     name: '单标的集中度',
-    description: '单一标的委托总金额占比超过阈值（按市场分别计算）',
+    description: '单一标的已成交金额占比超过阈值（按市场分别计算）',
     enabled: true,
     severity: 'MEDIUM',
     params: {
-      concentration_threshold: 0.30,
+      concentration_threshold: 0.40,
     },
   },
   {
@@ -128,12 +128,14 @@ export const DEFAULT_RULE_CONFIGS: RuleConfig[] = [
   {
     rule_id: 'R006',
     name: '对敲交易检测',
-    description: '不同账户在短时间内对同一标的进行方向相反、数量相近的交易',
+    description: '不同账户在短时间内对同一标的进行方向相反、数量相近的已成交交易',
     enabled: true,
     severity: 'HIGH',
     params: {
       time_window_minutes: 2,
-      quantity_deviation_threshold: 0.10,
+      quantity_deviation_threshold: 0.05,
+      min_amount_hk: 500_000,
+      min_amount_us: 100_000,
     },
   },
   {
@@ -169,18 +171,20 @@ export const DEFAULT_RULE_CONFIGS: RuleConfig[] = [
     severity: 'MEDIUM',
     params: {
       cancel_rate_threshold: 0.50,
-      min_order_count: 5,
+      min_order_count: 10,
     },
   },
   {
     rule_id: 'R010',
     name: '洗售交易检测',
-    description: '同一账户在短时间内对同一标的先买后卖（或先卖后买），数量相近',
+    description: '同一账户在短时间内对同一标的先买后卖（或先卖后买），数量相近的已成交交易',
     enabled: true,
     severity: 'HIGH',
     params: {
-      time_window_minutes: 10,
+      time_window_minutes: 5,
       quantity_deviation_threshold: 0.05,
+      min_amount_hk: 200_000,
+      min_amount_us: 50_000,
     },
   },
   {

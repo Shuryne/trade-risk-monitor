@@ -3,12 +3,13 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatPercent } from '@/utils/formatters'
+import { isExecutedOrder } from '../utils'
 
-/** R003: 单账户集中度 — 按市场分别计算 */
+/** R003: 单账户集中度 — 按市场分别计算，仅统计已成交订单金额 */
 export const accountConcentrationRule: RuleExecutor = {
   ruleId: 'R003',
   execute(orders: Order[], config: RuleConfig): RiskFlag[] {
-    const threshold = Number(config.params['concentration_threshold']) || 0.25
+    const threshold = Number(config.params['concentration_threshold']) || 0.35
     const flags: RiskFlag[] = []
 
     // 按市场分别计算
@@ -20,27 +21,30 @@ export const accountConcentrationRule: RuleExecutor = {
     }
 
     for (const [market, marketOrders] of byMarket) {
-      const totalAmount = marketOrders.reduce((sum, o) => sum + o.order_amount, 0)
+      // 仅用已成交订单计算集中度
+      const executedOrders = marketOrders.filter(isExecutedOrder)
+      const totalAmount = executedOrders.reduce((sum, o) => sum + o.order_amount, 0)
       if (totalAmount === 0) continue
 
-      // 按账户汇总
-      const byAccount = new Map<string, { amount: number; orders: Order[] }>()
+      // 按账户汇总已成交金额
+      const byAccount = new Map<string, { amount: number; allOrders: Order[] }>()
       for (const order of marketOrders) {
-        const entry = byAccount.get(order.account_id) ?? { amount: 0, orders: [] }
-        entry.amount += order.order_amount
-        entry.orders.push(order)
+        const entry = byAccount.get(order.account_id) ?? { amount: 0, allOrders: [] }
+        if (isExecutedOrder(order)) entry.amount += order.order_amount
+        entry.allOrders.push(order)
         byAccount.set(order.account_id, entry)
       }
 
-      for (const [accountId, { amount, orders: accountOrders }] of byAccount) {
+      for (const [accountId, { amount, allOrders }] of byAccount) {
+        if (amount === 0) continue
         const concentration = amount / totalAmount
         if (concentration >= threshold) {
-          for (const order of accountOrders) {
+          for (const order of allOrders) {
             flags.push({
               rule_id: config.rule_id,
               rule_name: config.name,
               severity: config.severity,
-              description: `账户 ${accountId} 在 ${market} 市场集中度 ${formatPercent(concentration)}，超过阈值 ${formatPercent(threshold)}`,
+              description: `账户 ${accountId} 在 ${market} 市场已成交集中度 ${formatPercent(concentration)}，超过阈值 ${formatPercent(threshold)}`,
               related_orders: [order.order_id],
             })
           }

@@ -20,11 +20,11 @@ const PARAM_LABELS: Record<string, Record<string, string>> = {
   R003: { concentration_threshold: '集中度阈值（0-1）' },
   R004: { concentration_threshold: '集中度阈值（0-1）' },
   R005: { deviation_threshold: '偏离阈值（0-1）' },
-  R006: { time_window_minutes: '时间窗口（分钟）', quantity_deviation_threshold: '数量偏差阈值（0-1）' },
+  R006: { time_window_minutes: '时间窗口（分钟）', quantity_deviation_threshold: '数量偏差阈值（0-1）', min_amount_hk: 'HK 最小金额 (HKD)', min_amount_us: 'US 最小金额 (USD)' },
   R007: { late_trading_hour: '起始小时 (HKT)', late_trading_minute: '起始分钟', threshold_hk: 'HK 金额阈值 (HKD)' },
   R008: { price_threshold: '股价阈值 (HKD)', amount_threshold_hk: 'HK 金额阈值 (HKD)' },
   R009: { cancel_rate_threshold: '撤单率阈值（0-1）', min_order_count: '最少订单数' },
-  R010: { time_window_minutes: '时间窗口（分钟）', quantity_deviation_threshold: '数量偏差阈值（0-1）' },
+  R010: { time_window_minutes: '时间窗口（分钟）', quantity_deviation_threshold: '数量偏差阈值（0-1）', min_amount_hk: 'HK 最小金额 (HKD)', min_amount_us: 'US 最小金额 (USD)' },
   R011: {},
 }
 
