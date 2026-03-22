@@ -7,6 +7,7 @@ import { runRiskEngine } from '@/services/riskEngine'
 interface RiskState {
   results: RiskResult[];
   hasResults: boolean;
+  error: string | null;
 
   analyze: (orders: Order[], ruleConfigs: RuleConfig[]) => void;
   updateReviewStatus: (orderId: string, status: ReviewStatus) => void;
@@ -17,10 +18,16 @@ interface RiskState {
 export const useRiskStore = create<RiskState>((set) => ({
   results: [],
   hasResults: false,
+  error: null,
 
   analyze: (orders, ruleConfigs) => {
-    const results = runRiskEngine(orders, ruleConfigs)
-    set({ results, hasResults: true })
+    try {
+      const results = runRiskEngine(orders, ruleConfigs)
+      set({ results, hasResults: true, error: null })
+    } catch (err) {
+      console.error('Risk analysis failed:', err)
+      set({ results: [], hasResults: false, error: String(err) })
+    }
   },
 
   updateReviewStatus: (orderId, status) => {
@@ -45,5 +52,5 @@ export const useRiskStore = create<RiskState>((set) => ({
     }))
   },
 
-  clear: () => set({ results: [], hasResults: false }),
+  clear: () => set({ results: [], hasResults: false, error: null }),
 }))

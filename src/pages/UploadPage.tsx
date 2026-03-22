@@ -18,8 +18,16 @@ export default function UploadPage() {
   const { analyze } = useRiskStore()
   const { configs } = useRuleConfigStore()
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+
   const handleFile = useCallback(
     (file: File) => {
+      if (file.size > MAX_FILE_SIZE) {
+        useOrderStore.setState({
+          parseErrors: [{ row: 0, column: '', message: `文件大小 ${(file.size / 1024 / 1024).toFixed(1)}MB 超过限制 (50MB)` }],
+        })
+        return
+      }
       loadFile(file)
     },
     [loadFile]

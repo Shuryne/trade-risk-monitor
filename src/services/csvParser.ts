@@ -108,9 +108,14 @@ export async function readFileContent(file: File): Promise<string> {
 
   // 检查是否有明显乱码：如果 UTF-8 解码后包含替换字符，尝试 GBK
   if (utf8Text.includes('\uFFFD')) {
-    const buffer = await file.arrayBuffer()
-    const decoder = new TextDecoder('gbk')
-    return decoder.decode(buffer)
+    try {
+      const buffer = await file.arrayBuffer()
+      const decoder = new TextDecoder('gbk')
+      return decoder.decode(buffer)
+    } catch {
+      // 浏览器不支持 GBK 编码，回退 UTF-8
+      return utf8Text
+    }
   }
 
   return utf8Text

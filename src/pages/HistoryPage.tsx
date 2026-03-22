@@ -17,10 +17,14 @@ export default function HistoryPage() {
   const navigate = useNavigate()
 
   const loadSessions = useCallback(async () => {
-    const all = await storageService.getAllSessions()
-    setSessions(all)
-    const usage = await storageService.estimateStorage()
-    setStorageUsed(usage)
+    try {
+      const all = await storageService.getAllSessions()
+      setSessions(all)
+      const usage = await storageService.estimateStorage()
+      setStorageUsed(usage)
+    } catch (err) {
+      console.error('Failed to load history:', err)
+    }
   }, [])
 
   useEffect(() => { loadSessions() }, [loadSessions])

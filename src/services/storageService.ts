@@ -17,29 +17,51 @@ const db = new TradeRiskDB()
 export const storageService = {
   /** 保存分析会话 */
   async saveSession(session: AnalysisSession): Promise<void> {
-    await db.sessions.put(session)
+    try {
+      await db.sessions.put(session)
+    } catch (err) {
+      console.error('Failed to save session:', err)
+    }
   },
 
   /** 获取所有会话（按创建时间降序） */
   async getAllSessions(): Promise<AnalysisSession[]> {
-    return db.sessions.orderBy('created_at').reverse().toArray()
+    try {
+      return await db.sessions.orderBy('created_at').reverse().toArray()
+    } catch (err) {
+      console.error('Failed to load sessions:', err)
+      return []
+    }
   },
 
   /** 获取指定会话 */
   async getSession(id: string): Promise<AnalysisSession | undefined> {
-    return db.sessions.get(id)
+    try {
+      return await db.sessions.get(id)
+    } catch (err) {
+      console.error('Failed to get session:', err)
+      return undefined
+    }
   },
 
   /** 删除指定会话 */
   async deleteSession(id: string): Promise<void> {
-    await db.sessions.delete(id)
+    try {
+      await db.sessions.delete(id)
+    } catch (err) {
+      console.error('Failed to delete session:', err)
+    }
   },
 
   /** 获取存储使用量估算（字节） */
   async estimateStorage(): Promise<number> {
-    if (navigator.storage && navigator.storage.estimate) {
-      const est = await navigator.storage.estimate()
-      return est.usage ?? 0
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const est = await navigator.storage.estimate()
+        return est.usage ?? 0
+      }
+    } catch (err) {
+      console.error('Failed to estimate storage:', err)
     }
     return 0
   },

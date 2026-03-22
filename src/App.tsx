@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { lazy, Suspense } from 'react'
 
 const UploadPage = lazy(() => import('@/pages/UploadPage'))
@@ -20,6 +21,7 @@ function Loading() {
 
 function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
@@ -33,6 +35,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

@@ -10,9 +10,12 @@ export default function TrendPage() {
   const [sessions, setSessions] = useState<AnalysisSession[]>([])
 
   const load = useCallback(async () => {
-    const all = await storageService.getAllSessions()
-    // 按日期升序
-    setSessions(all.sort((a, b) => a.date.localeCompare(b.date)))
+    try {
+      const all = await storageService.getAllSessions()
+      setSessions(all.sort((a, b) => a.date.localeCompare(b.date)))
+    } catch (err) {
+      console.error('Failed to load trend data:', err)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
