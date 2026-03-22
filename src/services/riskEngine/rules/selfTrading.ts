@@ -20,10 +20,8 @@ export const selfTradingRule: RuleExecutor = {
     const flags: RiskFlag[] = []
     const flaggedPairs = new Set<string>()
 
-    // 仅匹配已成交订单
     const executedOrders = orders.filter(isExecutedOrder)
 
-    // 按 账户 + 标的 分组
     const byAccountSymbol = new Map<string, Order[]>()
     for (const order of executedOrders) {
       const key = `${order.account_id}|${order.symbol}`
@@ -41,18 +39,14 @@ export const selfTradingRule: RuleExecutor = {
           const a = groupOrders[i]
           const b = groupOrders[j]
 
-          // 必须方向相反
           if (a.side === b.side) continue
 
-          // 最小金额门槛
           const minAmount = a.market === 'HK' ? minAmountHK : minAmountUS
           if (a.order_amount < minAmount || b.order_amount < minAmount) continue
 
-          // 时间窗口
           const timeDiff = minutesDiff(a.order_time, b.order_time)
           if (timeDiff > windowMinutes) continue
 
-          // 数量偏差
           const maxQty = Math.max(a.order_quantity, b.order_quantity)
           if (maxQty === 0) continue
           const qtyDeviation = Math.abs(a.order_quantity - b.order_quantity) / maxQty

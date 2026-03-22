@@ -12,7 +12,6 @@ export const accountConcentrationRule: RuleExecutor = {
     const threshold = Number(config.params['concentration_threshold']) || 0.35
     const flags: RiskFlag[] = []
 
-    // 按市场分别计算
     const byMarket = new Map<string, Order[]>()
     for (const order of orders) {
       const list = byMarket.get(order.market) ?? []
@@ -21,19 +20,20 @@ export const accountConcentrationRule: RuleExecutor = {
     }
 
     for (const [market, marketOrders] of byMarket) {
-      // 仅用已成交订单计算集中度
-      const executedOrders = marketOrders.filter(isExecutedOrder)
-      const totalAmount = executedOrders.reduce((sum, o) => sum + o.order_amount, 0)
-      if (totalAmount === 0) continue
-
-      // 按账户汇总已成交金额
+      let totalAmount = 0
       const byAccount = new Map<string, { amount: number; allOrders: Order[] }>()
+
       for (const order of marketOrders) {
         const entry = byAccount.get(order.account_id) ?? { amount: 0, allOrders: [] }
-        if (isExecutedOrder(order)) entry.amount += order.order_amount
+        if (isExecutedOrder(order)) {
+          entry.amount += order.order_amount
+          totalAmount += order.order_amount
+        }
         entry.allOrders.push(order)
         byAccount.set(order.account_id, entry)
       }
+
+      if (totalAmount === 0) continue
 
       for (const [accountId, { amount, allOrders }] of byAccount) {
         if (amount === 0) continue

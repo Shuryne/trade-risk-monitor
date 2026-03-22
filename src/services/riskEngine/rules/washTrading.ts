@@ -21,10 +21,8 @@ export const washTradingRule: RuleExecutor = {
     const flags: RiskFlag[] = []
     const flaggedPairs = new Set<string>()
 
-    // 仅匹配已成交订单
     const executedOrders = orders.filter(isExecutedOrder)
 
-    // 按标的分组
     const bySymbol = new Map<string, Order[]>()
     for (const order of executedOrders) {
       const list = bySymbol.get(order.symbol) ?? []
@@ -38,26 +36,20 @@ export const washTradingRule: RuleExecutor = {
           const a = symbolOrders[i]
           const b = symbolOrders[j]
 
-          // 必须不同账户
           if (a.account_id === b.account_id) continue
-          // 必须方向相反
           if (a.side === b.side) continue
 
-          // 最小金额门槛
           const minAmount = a.market === 'HK' ? minAmountHK : minAmountUS
           if (a.order_amount < minAmount || b.order_amount < minAmount) continue
 
-          // 时间窗口检查
           const timeDiff = minutesDiff(a.order_time, b.order_time)
           if (timeDiff > windowMinutes) continue
 
-          // 数量偏差检查
           const maxQty = Math.max(a.order_quantity, b.order_quantity)
           if (maxQty === 0) continue
           const qtyDeviation = Math.abs(a.order_quantity - b.order_quantity) / maxQty
           if (qtyDeviation > qtyDeviationThreshold) continue
 
-          // 避免重复标记同一对
           const pairKey = [a.order_id, b.order_id].sort().join('-')
           if (flaggedPairs.has(pairKey)) continue
           flaggedPairs.add(pairKey)

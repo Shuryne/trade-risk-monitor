@@ -12,7 +12,6 @@ export const symbolConcentrationRule: RuleExecutor = {
     const threshold = Number(config.params['concentration_threshold']) || 0.40
     const flags: RiskFlag[] = []
 
-    // 按市场分别计算
     const byMarket = new Map<string, Order[]>()
     for (const order of orders) {
       const list = byMarket.get(order.market) ?? []
@@ -21,18 +20,20 @@ export const symbolConcentrationRule: RuleExecutor = {
     }
 
     for (const [market, marketOrders] of byMarket) {
-      // 仅用已成交订单计算集中度
-      const executedOrders = marketOrders.filter(isExecutedOrder)
-      const totalAmount = executedOrders.reduce((sum, o) => sum + o.order_amount, 0)
-      if (totalAmount === 0) continue
-
+      let totalAmount = 0
       const bySymbol = new Map<string, { amount: number; allOrders: Order[] }>()
+
       for (const order of marketOrders) {
         const entry = bySymbol.get(order.symbol) ?? { amount: 0, allOrders: [] }
-        if (isExecutedOrder(order)) entry.amount += order.order_amount
+        if (isExecutedOrder(order)) {
+          entry.amount += order.order_amount
+          totalAmount += order.order_amount
+        }
         entry.allOrders.push(order)
         bySymbol.set(order.symbol, entry)
       }
+
+      if (totalAmount === 0) continue
 
       for (const [symbol, { amount, allOrders }] of bySymbol) {
         if (amount === 0) continue

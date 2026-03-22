@@ -3,6 +3,7 @@ import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import type { RuleExecutor } from '../types'
 import { formatPercent } from '@/utils/formatters'
+import { isExecutedOrder } from '../utils'
 
 /** R005: 成交价格偏离 — 成交均价偏离委托价格超过阈值（含部分成交） */
 export const priceDeviationRule: RuleExecutor = {
@@ -12,8 +13,7 @@ export const priceDeviationRule: RuleExecutor = {
     const flags: RiskFlag[] = []
 
     for (const order of orders) {
-      // 仅对已成交和部分成交的订单检测
-      if (order.order_status !== '成交' && order.order_status !== '部分成交') continue
+      if (!isExecutedOrder(order)) continue
       if (order.filled_quantity <= 0 || order.order_price <= 0) continue
 
       const deviation = Math.abs(order.filled_avg_price - order.order_price) / order.order_price
