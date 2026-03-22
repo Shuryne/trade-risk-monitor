@@ -16,6 +16,12 @@ interface RiskState {
   updateReviewStatus: (orderId: string, status: ReviewStatus) => void;
   batchUpdateReviewStatus: (orderIds: string[], status: ReviewStatus) => void;
   setNote: (orderId: string, note: string) => void;
+  restoreReviewData: (data: {
+    notes: Record<string, string>;
+    reviewTimestamps: Record<string, string>;
+    firstReviewAt: string | null;
+    lastReviewAt: string | null;
+  }) => void;
   clear: () => void;
 }
 
@@ -69,6 +75,8 @@ export const useRiskStore = create<RiskState>((set) => ({
     set((state) => ({
       notes: { ...state.notes, [orderId]: note },
     })),
+
+  restoreReviewData: (data) => set(data),
 
   clear: () => set({
     results: [],

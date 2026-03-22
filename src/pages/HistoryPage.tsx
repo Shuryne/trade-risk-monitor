@@ -45,6 +45,10 @@ export default function HistoryPage() {
     useRiskStore.setState({
       results: session.risk_results,
       hasResults: true,
+      notes: session.notes ?? {},
+      reviewTimestamps: session.reviewTimestamps ?? {},
+      firstReviewAt: session.firstReviewAt ?? null,
+      lastReviewAt: session.lastReviewAt ?? null,
     })
     navigate('/dashboard')
   }, [navigate])
