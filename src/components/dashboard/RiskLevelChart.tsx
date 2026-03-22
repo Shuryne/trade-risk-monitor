@@ -1,18 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { RiskResult } from '@/types/risk'
-
-const COLORS: Record<string, string> = {
-  HIGH: '#ef4444',
-  MEDIUM: '#f97316',
-  LOW: '#eab308',
-}
-
-const LABELS: Record<string, string> = {
-  HIGH: '高风险',
-  MEDIUM: '中风险',
-  LOW: '低风险',
-}
+import { SEVERITY_CONFIG } from '@/utils/severity'
 
 interface RiskLevelChartProps {
   results: RiskResult[];
@@ -26,7 +15,7 @@ export function RiskLevelChart({ results }: RiskLevelChartProps) {
 
   const data = Object.entries(counts)
     .filter(([, v]) => v > 0)
-    .map(([key, value]) => ({ name: LABELS[key], value, severity: key }))
+    .map(([key, value]) => ({ name: SEVERITY_CONFIG[key as keyof typeof SEVERITY_CONFIG].label, value, severity: key }))
 
   if (data.length === 0) {
     return (
@@ -47,7 +36,7 @@ export function RiskLevelChart({ results }: RiskLevelChartProps) {
           <PieChart>
             <Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
               {data.map(entry => (
-                <Cell key={entry.severity} fill={COLORS[entry.severity]} />
+                <Cell key={entry.severity} fill={SEVERITY_CONFIG[entry.severity as keyof typeof SEVERITY_CONFIG].chartColor} />
               ))}
             </Pie>
             <Tooltip />

@@ -64,13 +64,6 @@ export const VALID_OPEN_CLOSE = ['開倉', '平倉'] as const;
 /** 合法的市场 */
 export const VALID_MARKETS = ['HK', 'US'] as const;
 
-/** 风险等级排序权重（越高越严重） */
-export const SEVERITY_WEIGHT: Record<string, number> = {
-  HIGH: 3,
-  MEDIUM: 2,
-  LOW: 1,
-};
-
 /** 11 条默认规则配置 */
 export const DEFAULT_RULE_CONFIGS: RuleConfig[] = [
   {

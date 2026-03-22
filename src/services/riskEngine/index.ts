@@ -2,7 +2,7 @@ import type { Order } from '@/types/order'
 import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag, RiskResult } from '@/types/risk'
 import { getExecutor } from './ruleRegistry'
-import { SEVERITY_WEIGHT } from '@/utils/constants'
+import { severityWeight } from '@/utils/severity'
 import type { RuleSeverity } from '@/types/rule'
 
 /**
@@ -66,7 +66,7 @@ export function runRiskEngine(orders: Order[], ruleConfigs: RuleConfig[]): RiskR
   }
 
   // 按风险等级降序排序
-  results.sort((a, b) => (SEVERITY_WEIGHT[b.highest_severity] ?? 0) - (SEVERITY_WEIGHT[a.highest_severity] ?? 0))
+  results.sort((a, b) => severityWeight(b.highest_severity) - severityWeight(a.highest_severity))
 
   return results
 }
@@ -74,7 +74,7 @@ export function runRiskEngine(orders: Order[], ruleConfigs: RuleConfig[]): RiskR
 function getHighestSeverity(flags: RiskFlag[]): RuleSeverity {
   let highest: RuleSeverity = 'LOW'
   for (const flag of flags) {
-    if ((SEVERITY_WEIGHT[flag.severity] ?? 0) > (SEVERITY_WEIGHT[highest] ?? 0)) {
+    if (severityWeight(flag.severity) > severityWeight(highest)) {
       highest = flag.severity
     }
   }

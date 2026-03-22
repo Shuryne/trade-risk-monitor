@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { RiskBadge } from '@/components/shared/RiskBadge'
 import type { RiskResult } from '@/types/risk'
 import type { RuleSeverity } from '@/types/rule'
-import { SEVERITY_WEIGHT } from '@/utils/constants'
+import { severityWeight } from '@/utils/severity'
 
 interface TopAccountsTableProps {
   results: RiskResult[];
@@ -17,7 +17,7 @@ export function TopAccountsTable({ results }: TopAccountsTableProps) {
     const acc = r.order.account_id
     const existing = accountMap.get(acc) ?? { count: 0, highestSeverity: 'LOW' as RuleSeverity }
     existing.count++
-    if ((SEVERITY_WEIGHT[r.highest_severity] ?? 0) > (SEVERITY_WEIGHT[existing.highestSeverity] ?? 0)) {
+    if (severityWeight(r.highest_severity) > severityWeight(existing.highestSeverity)) {
       existing.highestSeverity = r.highest_severity
     }
     accountMap.set(acc, existing)

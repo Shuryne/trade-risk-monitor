@@ -5,6 +5,7 @@ import { RiskBadge } from '@/components/shared/RiskBadge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatDateTime, formatAmount, sideColorClass } from '@/utils/formatters'
 import { cn } from '@/lib/utils'
+import { SEVERITY_CONFIG } from '@/utils/severity'
 
 interface RiskOrderListProps {
   results: RiskResult[];
@@ -12,12 +13,6 @@ interface RiskOrderListProps {
   checkedIds: Set<string>;
   onSelect: (id: string) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
-}
-
-const severityBorderColor: Record<string, string> = {
-  HIGH: 'border-l-red-500',
-  MEDIUM: 'border-l-orange-400',
-  LOW: 'border-l-yellow-400',
 }
 
 export const RiskOrderList = memo(function RiskOrderList({
@@ -95,7 +90,7 @@ const RiskOrderItem = memo(function RiskOrderItem({
     <div
       className={cn(
         'group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors border-b border-l-2',
-        severityBorderColor[r.highest_severity] ?? 'border-l-transparent',
+        SEVERITY_CONFIG[r.highest_severity]?.borderClassName ?? 'border-l-transparent',
         isSelected ? 'bg-accent border-l-primary' : 'hover:bg-muted/50',
       )}
       onClick={handleClick}

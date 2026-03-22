@@ -1,5 +1,4 @@
 import type { Currency } from '@/types/order'
-import type { RuleSeverity } from '@/types/rule'
 import dayjs from 'dayjs'
 
 /**
@@ -46,17 +45,7 @@ export function formatDate(isoTime: string): string {
   return dayjs(isoTime).format('YYYY-MM-DD')
 }
 
-/**
- * 风险等级显示标签（中文）
- */
-export function severityLabel(severity: RuleSeverity): string {
-  const labels: Record<RuleSeverity, string> = {
-    HIGH: '高风险',
-    MEDIUM: '中风险',
-    LOW: '低风险',
-  }
-  return labels[severity]
-}
+export { severityLabel } from './severity'
 
 /** 买卖方向对应的颜色 class */
 export function sideColorClass(side: string): string {
