@@ -1,41 +1,178 @@
-import { useRef, memo, useCallback } from 'react'
+import { useRef, useState, useEffect, useMemo, memo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { RiskResult } from '@/types/risk'
-import { RiskBadge } from '@/components/shared/RiskBadge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { formatDateTime, formatAmount, sideColorClass } from '@/utils/formatters'
-import { cn } from '@/lib/utils'
+import type { RiskResult, ReviewStatus } from '@/types/risk'
+import type { RuleSeverity } from '@/types/rule'
+import { useUiStore } from '@/stores/uiStore'
+import { GroupHeader } from './GroupHeader'
+import { OrderCard } from './OrderCard'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type ListRow =
+  | { type: 'header'; severity: RuleSeverity; results: RiskResult[] }
+  | { type: 'item'; result: RiskResult }
 
 interface RiskOrderListProps {
-  results: RiskResult[];
-  selectedId: string | null;
-  checkedIds: Set<string>;
-  onSelect: (id: string) => void;
-  onToggleCheck: (id: string, checked: boolean) => void;
+  results: RiskResult[]
+  selectedId: string | null
+  focusedIndex: number
+  checkedIds: Set<string>
+  onSelect: (id: string) => void
+  onToggleCheck: (id: string, checked: boolean) => void
+  onShiftClick: (e: React.MouseEvent, id: string) => void
+  onBatchMark: (ids: string[], status: ReviewStatus) => void
 }
 
-const severityBorderColor: Record<string, string> = {
-  HIGH: 'border-l-red-500',
-  MEDIUM: 'border-l-orange-400',
-  LOW: 'border-l-yellow-400',
+// ---------------------------------------------------------------------------
+// Severity order
+// ---------------------------------------------------------------------------
+
+const SEVERITY_ORDER: RuleSeverity[] = ['HIGH', 'MEDIUM', 'LOW']
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function sortResults(
+  results: RiskResult[],
+  sortBy: 'amount' | 'time' | 'ruleCount',
+): RiskResult[] {
+  const sorted = [...results]
+  switch (sortBy) {
+    case 'amount':
+      sorted.sort((a, b) => b.order.order_amount - a.order.order_amount)
+      break
+    case 'time':
+      sorted.sort(
+        (a, b) =>
+          new Date(b.order.order_time).getTime() -
+          new Date(a.order.order_time).getTime(),
+      )
+      break
+    case 'ruleCount':
+      sorted.sort((a, b) => b.flags.length - a.flags.length)
+      break
+  }
+  return sorted
 }
+
+function isGroupComplete(results: RiskResult[]): boolean {
+  return results.length > 0 && results.every((r) => r.review_status !== 'PENDING')
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export const RiskOrderList = memo(function RiskOrderList({
   results,
   selectedId,
+  focusedIndex,
   checkedIds,
   onSelect,
   onToggleCheck,
+  onShiftClick,
+  onBatchMark,
 }: RiskOrderListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const sortBy = useUiStore((s) => s.sortBy)
 
-  const virtualizer = useVirtualizer({
-    count: results.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 82,
-    overscan: 8,
+  // ---- Collapse state ----
+  const [collapsed, setCollapsed] = useState<Record<RuleSeverity, boolean>>({
+    HIGH: false,
+    MEDIUM: false,
+    LOW: true,
   })
 
+  const toggleCollapse = (severity: RuleSeverity) => {
+    setCollapsed((prev) => ({ ...prev, [severity]: !prev[severity] }))
+  }
+
+  // ---- Group results by severity and sort within groups ----
+  const groupedResults = useMemo(() => {
+    const groups: Record<RuleSeverity, RiskResult[]> = {
+      HIGH: [],
+      MEDIUM: [],
+      LOW: [],
+    }
+    for (const r of results) {
+      groups[r.highest_severity].push(r)
+    }
+    return {
+      HIGH: sortResults(groups.HIGH, sortBy),
+      MEDIUM: sortResults(groups.MEDIUM, sortBy),
+      LOW: sortResults(groups.LOW, sortBy),
+    }
+  }, [results, sortBy])
+
+  // ---- Auto-collapse on group completion ----
+  // Track previous completion state to only trigger when a group *becomes* complete
+  const prevCompleteRef = useRef<Record<RuleSeverity, boolean>>({
+    HIGH: false,
+    MEDIUM: false,
+    LOW: false,
+  })
+
+  useEffect(() => {
+    const newCollapsed = { ...collapsed }
+    let changed = false
+
+    for (const sev of SEVERITY_ORDER) {
+      const groupResults = groupedResults[sev]
+      const wasComplete = prevCompleteRef.current[sev]
+      const nowComplete = isGroupComplete(groupResults)
+
+      // Only auto-collapse when the group transitions to complete (not on mount)
+      if (nowComplete && !wasComplete && groupResults.length > 0) {
+        newCollapsed[sev] = true
+        changed = true
+      }
+
+      prevCompleteRef.current[sev] = nowComplete
+    }
+
+    if (changed) {
+      setCollapsed(newCollapsed)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupedResults])
+
+  // ---- Build flat rows for virtualizer ----
+  const flatRows = useMemo<ListRow[]>(() => {
+    const rows: ListRow[] = []
+    for (const sev of SEVERITY_ORDER) {
+      const groupResults = groupedResults[sev]
+      if (groupResults.length === 0) continue
+
+      rows.push({ type: 'header', severity: sev, results: groupResults })
+
+      if (!collapsed[sev]) {
+        for (const result of groupResults) {
+          rows.push({ type: 'item', result })
+        }
+      }
+    }
+    return rows
+  }, [groupedResults, collapsed])
+
+  // ---- Virtualizer ----
+  const virtualizer = useVirtualizer({
+    count: flatRows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index) => (flatRows[index].type === 'header' ? 48 : 96),
+    overscan: 5,
+  })
+
+  // ---- Scroll to focused index ----
+  useEffect(() => {
+    if (focusedIndex >= 0 && focusedIndex < flatRows.length) {
+      virtualizer.scrollToIndex(focusedIndex, { align: 'center' })
+    }
+  }, [focusedIndex, flatRows.length, virtualizer])
+
+  // ---- Empty state ----
   if (results.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6">
@@ -47,88 +184,102 @@ export const RiskOrderList = memo(function RiskOrderList({
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
       <div
-        className="relative w-full"
+        className="relative w-full transition-[height] duration-150"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
-        {virtualizer.getVirtualItems().map(virtualItem => (
-          <div
-            key={virtualItem.key}
-            className="absolute left-0 top-0 w-full"
-            style={{ height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)` }}
-          >
-            <RiskOrderItem
-              result={results[virtualItem.index]}
-              isSelected={results[virtualItem.index].order.order_id === selectedId}
-              isChecked={checkedIds.has(results[virtualItem.index].order.order_id)}
-              onSelect={onSelect}
-              onToggleCheck={onToggleCheck}
-            />
-          </div>
-        ))}
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const row = flatRows[virtualItem.index]
+
+          return (
+            <div
+              key={virtualItem.key}
+              className="absolute left-0 top-0 w-full"
+              style={{
+                height: `${virtualItem.size}px`,
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              {row.type === 'header' ? (
+                <GroupHeaderRow
+                  row={row}
+                  collapsed={collapsed}
+                  checkedIds={checkedIds}
+                  onToggleCollapse={toggleCollapse}
+                  onToggleCheck={onToggleCheck}
+                  onBatchMark={onBatchMark}
+                />
+              ) : (
+                <OrderCard
+                  result={row.result}
+                  isActive={row.result.order.order_id === selectedId}
+                  isFocused={virtualItem.index === focusedIndex}
+                  isChecked={checkedIds.has(row.result.order.order_id)}
+                  onSelect={onSelect}
+                  onToggleCheck={onToggleCheck}
+                  onClick={onShiftClick}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
 })
 
-interface RiskOrderItemProps {
-  result: RiskResult;
-  isSelected: boolean;
-  isChecked: boolean;
-  onSelect: (id: string) => void;
-  onToggleCheck: (id: string, checked: boolean) => void;
+// ---------------------------------------------------------------------------
+// GroupHeader row wrapper — extracts stats and wires props
+// ---------------------------------------------------------------------------
+
+interface GroupHeaderRowProps {
+  row: Extract<ListRow, { type: 'header' }>
+  collapsed: Record<RuleSeverity, boolean>
+  checkedIds: Set<string>
+  onToggleCollapse: (severity: RuleSeverity) => void
+  onToggleCheck: (id: string, checked: boolean) => void
+  onBatchMark: (ids: string[], status: ReviewStatus) => void
 }
 
-const RiskOrderItem = memo(function RiskOrderItem({
-  result: r,
-  isSelected,
-  isChecked,
-  onSelect,
+const GroupHeaderRow = memo(function GroupHeaderRow({
+  row,
+  collapsed,
+  checkedIds,
+  onToggleCollapse,
   onToggleCheck,
-}: RiskOrderItemProps) {
-  const handleClick = useCallback(() => onSelect(r.order.order_id), [onSelect, r.order.order_id])
-  const handleCheck = useCallback(
-    (checked: boolean | 'indeterminate') => onToggleCheck(r.order.order_id, !!checked),
-    [onToggleCheck, r.order.order_id],
-  )
+  onBatchMark,
+}: GroupHeaderRowProps) {
+  const { severity, results: groupResults } = row
+
+  const pendingCount = groupResults.filter((r) => r.review_status === 'PENDING').length
+  const reviewedCount = groupResults.filter((r) => r.review_status === 'REVIEWED').length
+  const followUpCount = groupResults.filter((r) => r.review_status === 'FOLLOW_UP').length
+
+  const groupIds = groupResults.map((r) => r.order.order_id)
+  const checkedInGroup = groupIds.filter((id) => checkedIds.has(id))
+  const isAllSelected = checkedInGroup.length === groupIds.length
+  const isSomeSelected = checkedInGroup.length > 0 && !isAllSelected
 
   return (
-    <div
-      className={cn(
-        'group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors border-b border-l-2',
-        severityBorderColor[r.highest_severity] ?? 'border-l-transparent',
-        isSelected ? 'bg-accent border-l-primary' : 'hover:bg-muted/50',
-      )}
-      onClick={handleClick}
-    >
-      <Checkbox
-        checked={isChecked}
-        onCheckedChange={handleCheck}
-        className="h-4 w-4 mt-0.5 shrink-0"
-        onClick={e => e.stopPropagation()}
-      />
-
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
-          <RiskBadge severity={r.highest_severity} />
-          <span className="text-sm font-semibold truncate">{r.order.symbol}</span>
-          <span className={cn('text-xs font-medium px-1 py-0.5 rounded', sideColorClass(r.order.side))}>
-            {r.order.side}
-          </span>
-          <span className="text-xs text-muted-foreground ml-auto shrink-0">{r.order.market}</span>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-mono text-muted-foreground truncate">{r.order.account_id}</span>
-          <span className="ml-auto tabular-nums font-medium shrink-0">
-            {formatAmount(r.order.order_amount, r.order.currency)}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{formatDateTime(r.order.order_time)}</span>
-          <span className="ml-auto shrink-0">{r.flags.length} 条规则</span>
-        </div>
-      </div>
-    </div>
+    <GroupHeader
+      severity={severity}
+      total={groupResults.length}
+      pendingCount={pendingCount}
+      reviewedCount={reviewedCount}
+      followUpCount={followUpCount}
+      isExpanded={!collapsed[severity]}
+      isAllSelected={isAllSelected}
+      isSomeSelected={isSomeSelected}
+      onToggleExpand={() => onToggleCollapse(severity)}
+      onSelectAll={() => {
+        // Toggle: if all are selected, deselect all; otherwise select all
+        const shouldSelect = !isAllSelected
+        for (const id of groupIds) {
+          onToggleCheck(id, shouldSelect)
+        }
+      }}
+      onMarkAllReviewed={() => {
+        onBatchMark(groupIds, 'REVIEWED')
+      }}
+    />
   )
 })
