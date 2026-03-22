@@ -67,19 +67,19 @@ export default function DetailPage() {
 
       {checkedIds.size > 0 && (
         <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-1.5">
-          <span className="text-xs font-medium">已选 {checkedIds.size} 项</span>
+          <span className="text-sm font-medium">已选 {checkedIds.size} 项</span>
           <div className="flex gap-1 ml-2">
-            <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => handleBatchMark('REVIEWED')}>
-              <CheckCircle className="h-3 w-3" /> 已审阅
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2" onClick={() => handleBatchMark('REVIEWED')}>
+              <CheckCircle className="h-3.5 w-3.5" /> 已审阅
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => handleBatchMark('FOLLOW_UP')}>
-              <Flag className="h-3 w-3" /> 需跟进
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2" onClick={() => handleBatchMark('FOLLOW_UP')}>
+              <Flag className="h-3.5 w-3.5" /> 需跟进
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 px-2" onClick={() => handleBatchMark('FALSE_POSITIVE')}>
-              <XCircle className="h-3 w-3" /> 误报
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2" onClick={() => handleBatchMark('FALSE_POSITIVE')}>
+              <XCircle className="h-3.5 w-3.5" /> 误报
             </Button>
           </div>
-          <Button size="sm" variant="ghost" className="h-6 text-xs px-2 ml-auto" onClick={() => setCheckedIds(new Set())}>
+          <Button size="sm" variant="ghost" className="h-7 text-xs px-2 ml-auto" onClick={() => setCheckedIds(new Set())}>
             取消
           </Button>
         </div>
