@@ -65,8 +65,11 @@ export function runRiskEngine(orders: Order[], ruleConfigs: RuleConfig[]): RiskR
     })
   }
 
-  // 按风险等级降序排序
-  results.sort((a, b) => severityWeight(b.highest_severity) - severityWeight(a.highest_severity))
+  // 按风险等级降序排序，同等级按时间降序（最近的在前）
+  results.sort((a, b) => {
+    const d = severityWeight(b.highest_severity) - severityWeight(a.highest_severity)
+    return d !== 0 ? d : b.order.order_time.localeCompare(a.order.order_time)
+  })
 
   return results
 }

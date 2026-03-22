@@ -1,9 +1,9 @@
 import type { Order } from './order'
-import type { RuleConfig, RuleSeverity } from './rule'
+import type { RuleConfig, RuleId, RuleSeverity } from './rule'
 
 /** 单条风险标记 */
 export interface RiskFlag {
-  rule_id: string;
+  rule_id: RuleId;
   rule_name: string;
   severity: RuleSeverity;
   description: string;

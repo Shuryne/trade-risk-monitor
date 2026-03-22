@@ -1,4 +1,5 @@
 import type { RuleExecutor } from './types'
+import type { RuleId } from '@/types/rule'
 import { largeOrderRule } from './rules/largeOrderRule'
 import { highFrequencyRule } from './rules/highFrequencyRule'
 import { accountConcentrationRule } from './rules/accountConcentration'
@@ -27,7 +28,7 @@ const ruleExecutors: RuleExecutor[] = [
 ]
 
 /** 按 ruleId 获取执行器 */
-export function getExecutor(ruleId: string): RuleExecutor | undefined {
+export function getExecutor(ruleId: RuleId): RuleExecutor | undefined {
   return ruleExecutors.find(e => e.ruleId === ruleId)
 }
 

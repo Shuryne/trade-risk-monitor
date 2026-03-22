@@ -1,10 +1,10 @@
 import type { Order } from '@/types/order'
-import type { RuleConfig } from '@/types/rule'
+import type { RuleConfig, RuleId } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 
 /** 规则执行器统一接口 */
 export interface RuleExecutor {
-  ruleId: string;
+  ruleId: RuleId;
   execute(orders: Order[], config: RuleConfig): RiskFlag[];
 }
 

@@ -11,10 +11,10 @@ import { useRuleConfigStore } from '@/stores/ruleConfigStore'
 import { useRiskStore } from '@/stores/riskStore'
 import { useOrderStore } from '@/stores/orderStore'
 import { RotateCcw, Play } from 'lucide-react'
-import type { RuleConfig } from '@/types/rule'
+import type { RuleConfig, RuleId } from '@/types/rule'
 
 /** 定义每条规则有哪些可配置的参数 */
-const PARAM_LABELS: Record<string, Record<string, string>> = {
+const PARAM_LABELS: Record<RuleId, Record<string, string>> = {
   R001: { threshold_hk: 'HK 市场阈值 (HKD)', threshold_us: 'US 市场阈值 (USD)' },
   R002: { time_window_minutes: '时间窗口（分钟）', order_count_threshold: '下单次数阈值' },
   R003: { concentration_threshold: '集中度阈值（0-1）' },
