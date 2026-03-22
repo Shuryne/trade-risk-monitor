@@ -50,7 +50,10 @@ export const NUMERIC_FIELDS = [
 ] as const;
 
 /** 合法的订单状态值 */
-export const VALID_ORDER_STATUSES = ['成交', '已拒絕', '已過期', '已撤單', '部分成交'] as const;
+export const VALID_ORDER_STATUSES = [
+  '成交', '已拒絕', '已過期', '已撤單', '部分成交',
+  '已委託', '部成部撤', '待報', '待報（條件單）', '待報（保價）',
+] as const;
 
 /** 合法的交易方向 */
 export const VALID_SIDES = ['買入', '賣出'] as const;

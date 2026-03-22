@@ -32,7 +32,9 @@ export interface Order {
   currency: Currency;
 }
 
-export type OrderStatus = '成交' | '已拒絕' | '已過期' | '已撤單' | '部分成交';
+export type OrderStatus =
+  | '成交' | '已拒絕' | '已過期' | '已撤單' | '部分成交'
+  | '已委託' | '部成部撤' | '待報' | '待報（條件單）' | '待報（保價）';
 export type Market = 'HK' | 'US';
 export type Currency = 'HKD' | 'USD';
 
