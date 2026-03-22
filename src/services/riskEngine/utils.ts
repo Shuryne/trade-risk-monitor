@@ -3,7 +3,6 @@ import type { OrderStatus } from '@/types/order'
 import type { RuleConfig } from '@/types/rule'
 import type { RiskFlag } from '@/types/risk'
 import { minutesDiff } from '@/utils/timezone'
-import { formatPercent } from '@/utils/formatters'
 
 const EXECUTED_STATUSES: readonly OrderStatus[] = ['成交', '部分成交']
 
