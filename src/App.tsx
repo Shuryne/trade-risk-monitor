@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Toaster } from '@/components/ui/sonner'
 import { lazy, Suspense } from 'react'
 
 const UploadPage = lazy(() => import('@/pages/UploadPage'))
@@ -33,7 +32,6 @@ function App() {
           <Route path="/trends" element={<Suspense fallback={<Loading />}><TrendPage /></Suspense>} />
         </Route>
       </Routes>
-      <Toaster position="bottom-right" richColors />
     </BrowserRouter>
   )
 }

@@ -46,11 +46,6 @@ export function formatDate(isoTime: string): string {
   return dayjs(isoTime).format('YYYY-MM-DD')
 }
 
-/** Extract HH:mm from ISO datetime string */
-export function formatTime(isoTime: string): string {
-  return dayjs(isoTime).format('HH:mm');
-}
-
 /**
  * 风险等级显示标签（中文）
  */
