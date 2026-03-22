@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import type { RiskResult, ReviewStatus } from '@/types/risk'
 import type { Order } from '@/types/order'
 import { RiskBadge } from '@/components/shared/RiskBadge'
@@ -9,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDateTime, formatAmount, formatNumber, sideColorClass } from '@/utils/formatters'
 import { useOrderStore } from '@/stores/orderStore'
 import { useRiskStore } from '@/stores/riskStore'
-import { useMemo } from 'react'
 import { CheckCircle, Flag, XCircle, Clock, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,11 +24,10 @@ interface OrderDetailPanelProps {
   result: RiskResult;
 }
 
-export function OrderDetailPanel({ result }: OrderDetailPanelProps) {
+export const OrderDetailPanel = memo(function OrderDetailPanel({ result }: OrderDetailPanelProps) {
   const allOrders = useOrderStore(s => s.orders)
   const updateReviewStatus = useRiskStore(s => s.updateReviewStatus)
 
-  // Single pass to collect both related order sets
   const { sameAccountOrders, sameSymbolOrders } = useMemo(() => {
     const acct: Order[] = []
     const sym: Order[] = []
@@ -45,7 +44,7 @@ export function OrderDetailPanel({ result }: OrderDetailPanelProps) {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-5 space-y-5">
+      <div className="p-5 space-y-6">
         {/* Header */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -111,13 +110,13 @@ export function OrderDetailPanel({ result }: OrderDetailPanelProps) {
           </h3>
           <div className="space-y-1.5">
             {result.flags.map((flag, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-md border px-3 py-2">
+              <div key={i} className="flex items-start gap-3 rounded-md border px-3 py-2 hover:border-primary/20 transition-colors">
                 <div className="shrink-0 pt-0.5">
                   <RiskBadge severity={flag.severity} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-medium">{flag.rule_id} {flag.rule_name}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 break-words">{flag.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 break-words">{flag.description}</p>
                 </div>
               </div>
             ))}
@@ -149,29 +148,29 @@ export function OrderDetailPanel({ result }: OrderDetailPanelProps) {
       </div>
     </ScrollArea>
   )
-}
+})
 
-function Field({ label, value, mono, bold }: { label: string; value: string; mono?: boolean; bold?: boolean }) {
+const Field = memo(function Field({ label, value, mono, bold }: { label: string; value: string; mono?: boolean; bold?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className={cn('text-xs mt-0.5', mono && 'font-mono', bold && 'font-semibold')}>{value}</p>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className={cn('text-sm mt-0.5', mono && 'font-mono', bold && 'font-semibold')}>{value}</p>
     </div>
   )
-}
+})
 
-function RelatedOrdersTable({ orders, highlightId }: { orders: Order[]; highlightId: string }) {
+const RelatedOrdersTable = memo(function RelatedOrdersTable({ orders, highlightId }: { orders: Order[]; highlightId: string }) {
   return (
-    <div className="rounded-md border max-h-64 overflow-auto">
+    <div className="rounded-md border max-h-80 overflow-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="text-[10px] h-7">时间</TableHead>
-            <TableHead className="text-[10px] h-7">方向</TableHead>
-            <TableHead className="text-[10px] h-7">标的</TableHead>
-            <TableHead className="text-[10px] h-7 text-right">数量</TableHead>
-            <TableHead className="text-[10px] h-7 text-right">金额</TableHead>
-            <TableHead className="text-[10px] h-7">状态</TableHead>
+            <TableHead className="text-xs h-8">时间</TableHead>
+            <TableHead className="text-xs h-8">方向</TableHead>
+            <TableHead className="text-xs h-8">标的</TableHead>
+            <TableHead className="text-xs h-8 text-right">数量</TableHead>
+            <TableHead className="text-xs h-8 text-right">金额</TableHead>
+            <TableHead className="text-xs h-8">状态</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -180,18 +179,18 @@ function RelatedOrdersTable({ orders, highlightId }: { orders: Order[]; highligh
               key={o.order_id}
               className={cn('text-xs', o.order_id === highlightId && 'bg-primary/5 font-medium')}
             >
-              <TableCell className="py-1.5 text-[11px]">{formatDateTime(o.order_time)}</TableCell>
-              <TableCell className={cn('py-1.5 text-[11px]', o.side === '買入' ? 'text-red-600' : 'text-green-600')}>
+              <TableCell className="py-2 text-xs">{formatDateTime(o.order_time)}</TableCell>
+              <TableCell className={cn('py-2 text-xs', o.side === '買入' ? 'text-red-600' : 'text-green-600')}>
                 {o.side}
               </TableCell>
-              <TableCell className="py-1.5 text-[11px] font-medium">{o.symbol}</TableCell>
-              <TableCell className="py-1.5 text-[11px] text-right tabular-nums">{formatNumber(o.order_quantity)}</TableCell>
-              <TableCell className="py-1.5 text-[11px] text-right tabular-nums">{formatAmount(o.order_amount, o.currency)}</TableCell>
-              <TableCell className="py-1.5 text-[11px]">{o.order_status}</TableCell>
+              <TableCell className="py-2 text-xs font-medium">{o.symbol}</TableCell>
+              <TableCell className="py-2 text-xs text-right tabular-nums">{formatNumber(o.order_quantity)}</TableCell>
+              <TableCell className="py-2 text-xs text-right tabular-nums">{formatAmount(o.order_amount, o.currency)}</TableCell>
+              <TableCell className="py-2 text-xs">{o.order_status}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </div>
   )
-}
+})

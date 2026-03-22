@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
@@ -7,7 +8,7 @@ import { DEFAULT_RULE_CONFIGS } from '@/utils/constants'
 
 const ALL_VALUE = '__all__'
 
-export function FilterBar() {
+export const FilterBar = memo(function FilterBar() {
   const { detailFilters, setDetailFilter, resetDetailFilters } = useUiStore()
   const hasFilters = Object.values(detailFilters).some(v => v !== null && v !== '')
 
@@ -69,7 +70,7 @@ export function FilterBar() {
       )}
     </div>
   )
-}
+})
 
 function CompactSelect({
   placeholder,
