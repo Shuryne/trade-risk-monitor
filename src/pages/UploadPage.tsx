@@ -41,7 +41,7 @@ export default function UploadPage() {
     const results = useRiskStore.getState().results
     const counts = countBySeverity(results)
     const session: AnalysisSession = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       date: summary.timeRange?.start?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       created_at: new Date().toISOString(),
       total_orders: orders.length,
