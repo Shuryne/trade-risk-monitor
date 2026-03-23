@@ -27,4 +27,4 @@ dist-ssr
 playwright-mcp/
 
 # Test data
-test_data/
+test-data/
